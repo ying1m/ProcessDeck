@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <UseWPF>true</UseWPF>
+    <!-- 只为托盘 NotifyIcon 启用 WinForms；它由 WindowsDesktop 运行时自带，无需第三方包。 -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <AssemblyName>ProcessDeck</AssemblyName>
+    <RootNamespace>ProcessDeck.App</RootNamespace>
+    <!-- 必需：高 DPI 感知声明，否则 WebView2 视口尺寸会大于窗口（见 app.manifest 内注释）。 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>ProcessDeck</Product>
+    <Description>可自定义面板的本地应用进程管理器</Description>
+    <Version>0.1.0</Version>
+    <!--
+      WFO0003：WinForms 分析器建议改用 ApplicationHighDpiMode 属性。
+      但那是 WinForms 的机制，本项目是 WPF 应用（仅借用 WinForms 的托盘图标），
+      WPF 的高 DPI 必须通过 app.manifest 声明，因此这里刻意忽略该建议。
+    -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    WinForms 的隐式 using 会引入 System.Windows.Forms / System.Drawing，
+    导致 Application、MessageBox、Color 等类型与 WPF 同名冲突。
+    这里显式移除，避免每个文件都要写全限定名。
+  -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProcessDeck.Core\ProcessDeck.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+  </ItemGroup>
+
+  <!-- 面板资源：wwwroot 原样拷到输出目录，WebView2 通过虚拟主机映射读取。 -->
+  <ItemGroup>
+    <None Update="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

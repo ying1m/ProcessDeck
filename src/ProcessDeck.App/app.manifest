@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="ProcessDeck.app" />
+
+  <!--
+    高 DPI 感知声明。
+
+    没有这一段时会发生什么（已实测）：
+      WPF 进程按 96 DPI 布局，窗口被撑到 1707x996 DIP；
+      而 WebView2 子窗口按显示器真实的 150% 缩放渲染，
+      于是内嵌浏览器的视口变成 1707x996 CSS 像素 —— 比物理屏幕还大，
+      面板下半部分（状态栏、第二行卡片）被推到屏幕外看不见。
+
+    PerMonitorV2 + permonitor 回退是 WPF 承载 WebView2 的正确配置。
+  -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">permonitorv2,permonitor</dpiAwareness>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+      <!-- Windows 8.1 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" />
+    </application>
+  </compatibility>
+</assembly>

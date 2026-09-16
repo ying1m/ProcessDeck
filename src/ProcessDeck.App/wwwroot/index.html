@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'" />
+  <title>ProcessDeck</title>
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-name">ProcessDeck</span>
+      <span class="brand-sub">进程面板</span>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div class="topbar-actions">
+      <button class="btn ghost" id="btn-theme">切换主题</button>
+      <button class="btn primary" id="btn-add">+ 添加应用</button>
+    </div>
+  </header>
+
+  <main class="board" id="board"></main>
+
+  <footer class="statusbar">
+    <span id="engine-state">引擎：未连接（面板骨架阶段）</span>
+    <span class="spacer"></span>
+    <span id="port-watch">端口监控：待接入</span>
+    <span class="spacer"></span>
+    <span id="viewport" class="mono"></span>
+  </footer>
+
+  <script src="panel.js"></script>
+</body>
+</html>

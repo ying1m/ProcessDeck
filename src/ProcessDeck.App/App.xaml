@@ -1,0 +1,11 @@
+<Application x:Class="ProcessDeck.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <!--
+        ShutdownMode=OnExplicitShutdown：这是个托盘常驻应用，
+        关闭窗口只是收进托盘，不应该结束进程。
+        StartupUri 也刻意去掉 —— 窗口由 App.OnStartup 在单实例检查通过后创建。
+    -->
+    <Application.Resources />
+</Application>

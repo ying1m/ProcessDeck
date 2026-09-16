@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ProcessDeck.App/ProcessDeck.App.csproj" />
+    <Project Path="src/ProcessDeck.Core/ProcessDeck.Core.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ConPtyProbe/ConPtyProbe.csproj" />
+    <Project Path="tools/JobSmokeTest/JobSmokeTest.csproj" />
+    <Project Path="tools/SupervisorSmokeTest/SupervisorSmokeTest.csproj" />
+  </Folder>
+</Solution>

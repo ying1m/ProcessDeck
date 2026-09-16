@@ -1,0 +1,20 @@
+<Window x:Class="ProcessDeck.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="ProcessDeck"
+        Height="700" Width="1120"
+        MinHeight="420" MinWidth="720"
+        Background="#0E1116"
+        Foreground="#E6EDF3"
+        WindowStartupLocation="CenterScreen">
+
+    <!--
+        外壳极简：整块区域交给 WebView2。
+        「高度可自定义的 UI」这件事完全发生在 wwwroot 里的 HTML/CSS/JS，
+        外壳只负责托盘、置顶、单实例、以及后续的进程管控能力注入。
+    -->
+    <Grid>
+        <wv2:WebView2 x:Name="Panel" />
+    </Grid>
+</Window>
