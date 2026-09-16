@@ -101,7 +101,7 @@ ProcessDeck 就是这块缺口。
 ### 3. 从源码构建
 
 ```powershell
-git clone https://github.com/<you>/ProcessDeck.git
+git clone https://github.com/ying1m/ProcessDeck.git
 cd ProcessDeck
 dotnet build ProcessDeck.slnx -c Release
 dotnet run --project src/ProcessDeck.App
