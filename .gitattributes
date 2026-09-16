@@ -1,0 +1,27 @@
+# 统一换行符处理，避免 Windows / Linux 协作时反复出现
+# "LF will be replaced by CRLF" 之类的噪声，以及无意义的整文件 diff。
+* text=auto
+
+# 源码与文档
+*.cs      text diff=csharp
+*.csproj  text
+*.slnx    text
+*.xaml    text
+*.json    text
+*.md      text
+*.js      text
+*.css     text
+*.html    text
+
+# Windows 脚本保持 CRLF：
+# Windows PowerShell 5.1 以 ANSI 读取 .ps1，LF-only 在 here-string 等语法上不可靠。
+*.ps1     text eol=crlf
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+# 二进制
+*.png     binary
+*.ico     binary
+*.exe     binary
+*.dll     binary
+*.pdb     binary
