@@ -1,5 +1,8 @@
+using System.IO;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using ProcessDeck.Core;
+using ProcessDeck.Core.Cards;
 using ProcessDeck.Core.Configuration;
 using ProcessDeck.Core.Supervision;
 
@@ -60,6 +63,12 @@ public sealed record DeckSnapshot
 
     /// <summary>引擎自述，显示在状态栏。</summary>
     public required string EngineState { get; init; }
+
+    /// <summary>可用卡片（内置 + 用户自定义）。</summary>
+    public IReadOnlyList<CardDescriptor> Cards { get; init; } = Array.Empty<CardDescriptor>();
+
+    /// <summary>卡片发现过程中的问题，用于提示用户而不是静默失败。</summary>
+    public IReadOnlyList<string> CardProblems { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>
@@ -78,6 +87,9 @@ public sealed class DeckHostService : IDisposable
     private readonly List<AppSupervisor> _supervisors = new();
     private readonly object _gate = new();
     private readonly Timer _portWatchTimer;
+
+    private IReadOnlyList<CardDescriptor> _cards = Array.Empty<CardDescriptor>();
+    private IReadOnlyList<string> _cardProblems = Array.Empty<string>();
 
     private bool _disposed;
 
@@ -127,6 +139,8 @@ public sealed class DeckHostService : IDisposable
             Configuration = _store.Load(out var error);
             LoadError = error;
 
+            RefreshCards();
+
             foreach (var definition in Configuration.Apps)
             {
                 var supervisor = new AppSupervisor(definition);
@@ -144,12 +158,16 @@ public sealed class DeckHostService : IDisposable
         List<AppSupervisor> supervisors;
         DeckConfiguration configuration;
         string? loadError;
+        IReadOnlyList<CardDescriptor> cards;
+        IReadOnlyList<string> cardProblems;
 
         lock (_gate)
         {
             supervisors = _supervisors.ToList();
             configuration = Configuration;
             loadError = LoadError;
+            cards = _cards;
+            cardProblems = _cardProblems;
         }
 
         var apps = new List<AppSnapshot>(supervisors.Count);
@@ -208,7 +226,36 @@ public sealed class DeckHostService : IDisposable
             ConfigurationPath = _store.FilePath,
             LoadError = loadError,
             EngineState = $"共 {apps.Count} 个应用 · 运行中 {running} · 异常 {failed}",
+            Cards = cards,
+            CardProblems = cardProblems,
         };
+    }
+
+    /// <summary>
+    /// 扫描内置与用户卡片目录。
+    ///
+    /// 卡片代码永远不进入宿主进程：这里只读清单、校验路径、拼出沙箱 iframe 的地址。
+    /// </summary>
+    private void RefreshCards()
+    {
+        var roots = new[]
+        {
+            new CardRoot(
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "cards"),
+                "https://processdeck.local/cards",
+                "builtin",
+                "内置"),
+
+            // 用户卡片放在数据目录下，映射到第二个虚拟主机。
+            new CardRoot(
+                DeckPaths.UserCardsDirectory,
+                "https://processdeck-cards.local",
+                "user",
+                "用户"),
+        };
+
+        _cards = CardCatalog.Discover(roots, out var problems);
+        _cardProblems = problems;
     }
 
     // ------------------------------------------------------------------

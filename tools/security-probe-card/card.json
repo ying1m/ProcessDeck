@@ -1,0 +1,9 @@
+{
+  "id": "security-probe",
+  "name": "安全探针",
+  "description": "回归测试：验证沙箱卡片无法绕过白名单直接与宿主 IPC。",
+  "author": "ProcessDeck",
+  "version": "1.0.0",
+  "entry": "card.html",
+  "order": 999
+}

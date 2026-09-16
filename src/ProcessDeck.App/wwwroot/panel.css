@@ -294,3 +294,43 @@ body {
 .toast[data-level="error"] {
   border-color: color-mix(in srgb, var(--state-failed) 55%, transparent);
 }
+
+/* ---------------- 自定义卡片宿主 ---------------- */
+
+/*
+  必须显式写 [hidden] 规则：.board 上有 display:grid、.card-host 上有 display:flex，
+   作者样式优先级高于 UA 样式表的 [hidden]{display:none}，不加这几条 hidden 会失效。
+*/
+.board[hidden],
+.card-host[hidden] {
+  display: none;
+}
+
+.card-host {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.card-host iframe {
+  flex: 1;
+  border: 0;
+  background: var(--bg);
+}
+
+/* 卡片选择器外观对齐按钮 */
+#card-picker {
+  appearance: none;
+  padding-right: 26px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--fg-muted) 50%),
+                    linear-gradient(135deg, var(--fg-muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 52%, calc(100% - 9px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--fg-muted);
+}
+
+#card-picker option {
+  background: var(--bg-elevated);
+  color: var(--fg);
+}

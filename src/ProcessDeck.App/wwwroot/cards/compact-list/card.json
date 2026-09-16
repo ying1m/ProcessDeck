@@ -1,0 +1,9 @@
+{
+  "id": "compact-list",
+  "name": "紧凑列表",
+  "description": "把所有应用显示成一行一条的紧凑列表，应用较多时比卡片网格更省地方。",
+  "author": "ProcessDeck",
+  "version": "1.0.0",
+  "entry": "card.html",
+  "order": 10
+}

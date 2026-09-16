@@ -2,8 +2,16 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
+  <!--
+    CSP 说明：
+      default-src 'none' 是基线，其余逐项开口。
+      frame-src 必须显式列出，否则它会回落到 default-src 'none'，
+      自定义卡片会因为「已阻止此内容」而加载失败。
+      'self' 覆盖内置卡片（processdeck.local），
+      第二个源覆盖用户卡片（映射到 %APPDATA%\ProcessDeck\cards 的虚拟主机）。
+  -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'" />
+        content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; frame-src 'self' https://processdeck-cards.local" />
   <title>ProcessDeck</title>
   <link rel="stylesheet" href="panel.css" />
 </head>
@@ -16,12 +24,23 @@
     </div>
     <div class="summary" id="summary"></div>
     <div class="topbar-actions">
+      <select class="btn" id="card-picker" title="切换面板卡片"></select>
       <button class="btn ghost" id="btn-theme">切换主题</button>
       <button class="btn primary" id="btn-add">+ 添加应用</button>
     </div>
   </header>
 
   <main class="board" id="board"></main>
+
+  <!--
+    自定义卡片宿主。
+    sandbox 只给 allow-scripts，刻意不给 allow-same-origin：
+    卡片文档因此获得不透明源，拿不到父页面 DOM / cookie / localStorage，
+    只能通过 postMessage 走白名单 API。
+  -->
+  <section class="card-host" id="card-host" hidden>
+    <iframe id="card-frame" sandbox="allow-scripts" title="自定义卡片"></iframe>
+  </section>
 
   <footer class="statusbar">
     <span id="engine-state">引擎：未连接（面板骨架阶段）</span>

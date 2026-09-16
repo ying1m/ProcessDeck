@@ -21,6 +21,9 @@ const summary = document.getElementById('summary');
 const engineStateEl = document.getElementById('engine-state');
 const portWatchEl = document.getElementById('port-watch');
 const viewportEl = document.getElementById('viewport');
+const cardHost = document.getElementById('card-host');
+const cardFrame = document.getElementById('card-frame');
+const cardPicker = document.getElementById('card-picker');
 
 const STATE_LABEL = {
   stopped: '已停止',
@@ -97,7 +100,184 @@ function applySnapshot(data) {
   cardOrder = ordered.map((a) => a.id);
   reconcile(ordered);
   updateSummary();
+  renderCardPicker(data.cards || []);
+  applyActiveCard();
+  pushToCard();
 }
+
+/* ---------------- 自定义卡片宿主 ---------------- */
+
+const GRID_CARD_ID = '__grid__';
+
+let activeCardId = GRID_CARD_ID;
+
+function renderCardPicker(cards) {
+  const desired = [GRID_CARD_ID].concat(cards.map((c) => c.id));
+  const current = Array.from(cardPicker.options).map((o) => o.value);
+
+  // 选项集合没变就不要重建 —— 重建会把用户正在展开的下拉关掉。
+  if (desired.length === current.length && desired.every((id, i) => id === current[i])) {
+    cardPicker.value = activeCardId;
+    return;
+  }
+
+  cardPicker.textContent = '';
+
+  const gridOption = document.createElement('option');
+  gridOption.value = GRID_CARD_ID;
+  gridOption.textContent = '网格（默认）';
+  cardPicker.appendChild(gridOption);
+
+  for (const card of cards) {
+    const option = document.createElement('option');
+    option.value = card.id;
+    option.textContent = card.source === 'user' ? `${card.name}（用户）` : card.name;
+    if (card.description) {
+      option.title = card.description;
+    }
+    cardPicker.appendChild(option);
+  }
+
+  cardPicker.value = activeCardId;
+}
+
+function resolveActiveCardId() {
+  const layout = (snapshot && snapshot.layout) || {};
+  const wanted = layout.cardId || GRID_CARD_ID;
+  const available = (snapshot && snapshot.cards) || [];
+
+  // 卡片被删掉或改坏了就退回默认网格，不能让面板变成一片空白。
+  if (wanted === GRID_CARD_ID || available.some((c) => c.id === wanted)) {
+    return wanted;
+  }
+
+  return GRID_CARD_ID;
+}
+
+function applyActiveCard() {
+  activeCardId = resolveActiveCardId();
+
+  if (cardPicker.value !== activeCardId) {
+    cardPicker.value = activeCardId;
+  }
+
+  const usingCard = activeCardId !== GRID_CARD_ID;
+  board.hidden = usingCard;
+  cardHost.hidden = !usingCard;
+
+  if (!usingCard) {
+    cardFrame.removeAttribute('src');
+    delete cardFrame.dataset.cardId;
+    return;
+  }
+
+  const card = (snapshot.cards || []).find((c) => c.id === activeCardId);
+  if (!card) {
+    return;
+  }
+
+  if (cardFrame.dataset.cardId !== card.id) {
+    cardFrame.dataset.cardId = card.id;
+    cardFrame.src = card.entryUrl;
+  }
+}
+
+cardPicker.addEventListener('change', () => {
+  const layout = Object.assign({}, (snapshot && snapshot.layout) || {}, { cardId: cardPicker.value });
+  send({ type: 'savePreferences', theme: snapshot ? snapshot.theme : 'dark', layout });
+  applyActiveCard();
+});
+
+/**
+ * 卡片能调用的全部方法 —— 这就是安全边界。
+ * 没有文件、没有注册表、没有任意命令、没有网络。
+ */
+const CARD_API = {
+  getApps: () => ((snapshot && snapshot.apps) || []),
+  getTheme: () => ((snapshot && snapshot.theme) || 'dark'),
+  start: (params) => {
+    send({ type: 'startApp', appId: requireAppId(params) });
+    return { accepted: true };
+  },
+  stop: (params) => {
+    send({ type: 'stopApp', appId: requireAppId(params) });
+    return { accepted: true };
+  },
+  restart: (params) => {
+    send({ type: 'restartApp', appId: requireAppId(params) });
+    return { accepted: true };
+  },
+};
+
+function requireAppId(params) {
+  const appId = params && params.appId;
+  if (typeof appId !== 'string' || appId.length === 0) {
+    throw new Error('缺少 appId 参数');
+  }
+  return appId;
+}
+
+function handleCardMessage(event) {
+  // 关键校验：沙箱文档的 event.origin 是字符串 "null"，无法用于鉴权；
+  // 唯一可信的判据是「发消息的窗口就是我们的那个 iframe」。
+  if (!cardFrame.contentWindow || event.source !== cardFrame.contentWindow) {
+    return;
+  }
+
+  const message = event.data;
+  if (!message || message.__processdeck !== true) {
+    return;
+  }
+
+  if (message.type === 'ready') {
+    pushToCard();
+    return;
+  }
+
+  if (message.type !== 'call') {
+    return;
+  }
+
+  let ok = true;
+  let value = null;
+  let error = null;
+
+  try {
+    const handler = CARD_API[message.method];
+
+    if (typeof handler !== 'function') {
+      throw new Error(`不支持的调用：${message.method}`);
+    }
+
+    value = handler(message.params);
+  } catch (e) {
+    ok = false;
+    error = String(e && e.message ? e.message : e);
+  }
+
+  cardFrame.contentWindow.postMessage(
+    { __processdeck: true, type: 'result', callId: message.callId, ok, value, error },
+    '*'
+  );
+}
+
+function pushToCard() {
+  if (!cardFrame.contentWindow || activeCardId === GRID_CARD_ID) {
+    return;
+  }
+
+  cardFrame.contentWindow.postMessage(
+    {
+      __processdeck: true,
+      type: 'snapshot',
+      apps: (snapshot && snapshot.apps) || [],
+      theme: (snapshot && snapshot.theme) || 'dark',
+    },
+    '*'
+  );
+}
+
+window.addEventListener('message', handleCardMessage);
 
 /* ---------------- 渲染 ---------------- */
 

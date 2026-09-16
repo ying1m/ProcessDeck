@@ -66,6 +66,14 @@ public partial class MainWindow : Window
                 webRoot,
                 CoreWebView2HostResourceAccessKind.DenyCors);
 
+            // 用户自定义卡片在 %APPDATA%\ProcessDeck\cards，不在 wwwroot 下，
+            // 因此需要单独映射一个虚拟主机。目录可能还不存在，先建出来。
+            Directory.CreateDirectory(ProcessDeck.Core.DeckPaths.UserCardsDirectory);
+            Panel.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "processdeck-cards.local",
+                ProcessDeck.Core.DeckPaths.UserCardsDirectory,
+                CoreWebView2HostResourceAccessKind.DenyCors);
+
             Panel.CoreWebView2.Settings.AreDevToolsEnabled = true;
             Panel.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             Panel.CoreWebView2.Settings.IsStatusBarEnabled = false;

@@ -23,6 +23,9 @@ public sealed class PanelBridge : IDisposable
 {
     private static readonly TimeSpan PushInterval = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>面板主文档的地址前缀，用于 IPC 来源校验。</summary>
+    private const string TrustedPanelDocument = "https://processdeck.local/index.html";
+
     private readonly CoreWebView2 _core;
     private readonly DeckHostService _host;
     private readonly DispatcherTimer _pushTimer;
@@ -94,6 +97,32 @@ public sealed class PanelBridge : IDisposable
 
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
+        // 必须校验来源，这不是可选项 —— 实测确认：
+        // WebView2 会把 window.chrome.webview **一并暴露给沙箱 iframe**，
+        // 而自定义卡片正是跑在 sandbox="allow-scripts" 的 iframe 里。
+        // 若这里不拦，一个被别人分享的卡片就能绕过白名单 API，
+        // 直接调用 stopApp / reloadConfig / savePreferences。
+        string? source;
+
+        try
+        {
+            source = e.Source;
+        }
+        catch (Exception ex)
+        {
+            // 来源地址本身可能读不出来（不透明源的框架上是常见情况），
+            // 读不到就必须按不可信处理，而不能让它抛出去变成未处理异常 ——
+            // 否则攻击被挡住了，日志里却什么都不留下。
+            ShellLog.Write($"IPC 来源不可读，已按不可信拒绝：{ex.Message}");
+            return;
+        }
+
+        if (!IsTrustedSource(source))
+        {
+            ShellLog.Write($"已拒绝来自非面板来源的 IPC 消息：{source}");
+            return;
+        }
+
         string json;
 
         try
@@ -108,6 +137,15 @@ public sealed class PanelBridge : IDisposable
 
         _ = HandleMessageAsync(json);
     }
+
+    /// <summary>
+    /// 可信来源：面板主文档本身。
+    /// 卡片 iframe 的地址前缀与 <see cref="TrustedPanelDocument"/> 不同，
+    /// 沙箱框架的源更是不可读，都会在这里被挡下。
+    /// </summary>
+    private static bool IsTrustedSource(string? source)
+        => !string.IsNullOrEmpty(source)
+           && source.StartsWith(TrustedPanelDocument, StringComparison.OrdinalIgnoreCase);
 
     private async Task HandleMessageAsync(string json)
     {

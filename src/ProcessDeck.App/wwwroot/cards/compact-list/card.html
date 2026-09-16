@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>紧凑列表</title>
+  <!--
+    这个文档运行在 sandbox="allow-scripts" 的 iframe 里（刻意不给 allow-same-origin），
+    因此它的源是不透明的：拿不到父页面的 DOM、cookie、localStorage，也读不到同源接口。
+    它唯一能与外界沟通的方式是 postMessage，而父页面只放行下面几个白名单方法。
+
+    注意这里没有写 CSP meta：沙箱文档的源是 opaque，CSP 里的 'self' 不会匹配到
+    自己的地址，反而会把 card.css / card.js 一起挡掉。
+  -->
+  <link rel="stylesheet" href="card.css" />
+</head>
+<body>
+  <div class="rows" id="rows"></div>
+  <p class="hint" id="hint">等待主程序推送数据…</p>
+  <script src="card.js"></script>
+</body>
+</html>

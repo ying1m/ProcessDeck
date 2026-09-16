@@ -205,3 +205,82 @@ port = ((raw & 0x000000FF) << 8) | ((raw & 0x0000FF00) >> 8);
 之后才能拿到真实的 2560×1600 全分辨率画面。
 
 **教训**：当观测结果和代码逻辑矛盾时，先怀疑观测手段。
+
+---
+
+## 9. CSP 的 `frame-src` 会回落到 `default-src`，把自定义卡片一起拦掉
+
+面板的 CSP 基线是 `default-src 'none'`，然后逐项开口。
+加入沙箱卡片时 iframe 直接显示：
+
+> 已阻止此内容。请与网站所有者联系以解决问题。
+
+原因不是 X-Frame-Options，也不是 WebView2 的虚拟主机，
+而是 **CSP 里没有写 `frame-src`，于是它回落到 `default-src 'none'`**，所有框架一律禁止。
+
+```html
+<!-- ✗ 卡片加载不出来 -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'">
+
+<!-- ✓ 显式列出卡片来源 -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self';
+               frame-src 'self' https://processdeck-cards.local">
+```
+
+内置卡片在 `'self'`（processdeck.local）下；用户卡片在 `%APPDATA%`，
+需要单独映射一个虚拟主机（`processdeck-cards.local`）并写进 `frame-src`。
+
+---
+
+## 10. 沙箱卡片的真实安全边界（实测，不是推测）
+
+### 反直觉的第一点：`window.chrome.webview` 对卡片**是可见的**
+
+自定义卡片跑在 `sandbox="allow-scripts"` 的 iframe 里（刻意不给 `allow-same-origin`）。
+按直觉，被沙箱隔离的框架应该碰不到宿主对象。**实测并非如此**：
+
+```
+沙箱 iframe 内的 document.origin = undefined
+window.chrome.webview 是否可见: 可见
+→ 直接发送 {type:"stopApp", appId:"web"}（未抛异常）
+```
+
+所以「沙箱会让宿主对象不可见」这个假设不成立，不能把它当作防线。
+
+### 但第二层挡住了它
+
+给宿主加了一行诊断，打印每一条到达的 IPC 消息：
+
+```
+IPC 收到消息 source=https://processdeck.local/index.html len=27   ← 面板的 ensureConfigFile
+IPC 收到消息 source=https://processdeck.local/index.html len=16   ← 面板的 hello
+```
+
+**卡片发出的三条消息，一条都没到。** 同时：
+
+- 被管应用没有被停止（端口 38440 / 38441 仍在监听）
+- 配置文件没有被改写（`theme` 仍是 `dark`）
+
+原因：**从不透明源（opaque origin）的沙箱框架发出的 `postMessage` 不会被路由到宿主**。
+消息在到达 `WebMessageReceived` 之前就消失了，所以连「已拒绝」的日志都不会产生 ——
+「消息送不到」和「消息被拒绝」是两件不同的事，排查时别混淆。
+
+### 结论：两层防线
+
+| 层 | 机制 | 作用 |
+|---|---|---|
+| 沙箱（主防线） | `sandbox="allow-scripts"`，不给 `allow-same-origin` | 框架源变不透明，`chrome.webview.postMessage` 送不出去 |
+| 来源校验（纵深防御） | 比对 `CoreWebView2WebMessageReceivedEventArgs.Source` | 万一消息送到了，非面板文档一律拒绝 |
+
+第二层仍然必须写：它防的是「以后有人给 iframe 加上 `allow-same-origin`」、
+或者卡片被放到非沙箱框架里加载这类改动。
+
+### 一个实现细节
+
+`e.Source` 在不透明源的框架上可能直接**抛异常**。如果不在 `try/catch` 里处理，
+异常会从事件处理器里逃出去，结果是「攻击被挡住了，但日志里什么都不留下」——
+排查时极其难查。正确做法是：读不到来源就按不可信处理，并留下日志。
+
+回归测试脚本保留在 `tools/security-probe-card/`，复制到用户卡片目录即可复跑。

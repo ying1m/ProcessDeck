@@ -112,6 +112,84 @@ dotnet run --project src/ProcessDeck.App
 
 ---
 
+## 自定义卡片
+
+面板默认是一个卡片网格。除此之外，你可以放入自己的卡片包，**完全替换**面板的呈现方式。
+
+### 卡片包结构
+
+一个卡片包就是一个目录：
+
+```
+my-card/
+  card.json     必需，清单
+  card.html     默认入口，运行在沙箱 iframe 中
+  card.js       可选
+  card.css      可选
+```
+
+`card.json`：
+
+```json
+{
+  "id": "my-card",
+  "name": "我的面板",
+  "description": "一句话说明",
+  "author": "you",
+  "version": "1.0.0",
+  "entry": "card.html",
+  "order": 100
+}
+```
+
+把目录放进 `%APPDATA%\ProcessDeck\cards\`，重启 ProcessDeck，
+即可在顶栏的卡片选择器里看到它。内置卡片在安装目录的 `wwwroot\cards\`，
+可以直接拿来改（`compact-list` 是一份完整参考实现）。
+
+### 卡片能用的 API
+
+通信只有一条通道 `postMessage`：
+
+```js
+// 卡片 → 宿主
+parent.postMessage({ __processdeck: true, type: 'ready' }, '*');
+parent.postMessage({
+  __processdeck: true, type: 'call', callId: 'c1',
+  method: 'start', params: { appId: 'web' }
+}, '*');
+
+// 宿主 → 卡片
+window.addEventListener('message', (e) => {
+  const m = e.data;
+  if (m.__processdeck && m.type === 'snapshot') { /* m.apps, m.theme */ }
+  if (m.__processdeck && m.type === 'result')   { /* m.callId, m.ok, m.value */ }
+});
+```
+
+| 白名单方法 | 参数 | 返回 |
+|---|---|---|
+| `getApps` | — | 应用快照数组 |
+| `getTheme` | — | 当前主题名 |
+| `start` / `stop` / `restart` | `{ appId }` | `{ accepted: true }` |
+
+白名单之外的方法一律返回错误。
+
+### 安全边界
+
+卡片运行在 `sandbox="allow-scripts"` 的 iframe 中，**刻意不给 `allow-same-origin`**：
+
+- 拿不到父页面 DOM、cookie、localStorage
+- 够不到文件系统、注册表，也无法自己起进程
+- 只有上面那几个白名单方法能对外界产生影响
+
+有一点值得说明：`window.chrome.webview` 对卡片**是可见的**（WebView2 会把它暴露给子框架），
+但**来自不透明源框架的消息不会被路由到宿主**，所以这条路走不通。宿主另外还校验消息来源作为纵深防御。
+完整分析与回归测试见 [`docs/engineering-notes.md`](docs/engineering-notes.md) 第 10 节与 `tools/security-probe-card/`。
+
+> 换句话说：别人分享给你的卡片，**最坏也只能启停你自己配置的应用**，无法读写你的文件。
+
+---
+
 ## ⚠️ 关于杀毒软件误报
 
 这个工具天生踩杀软的命门：**启动进程、回收进程树、结束占用端口的进程**。
@@ -160,17 +238,6 @@ WebView2 自带 `postMessage` / `WebMessageReceived` 通道，走**进程内消�
 
 ---
 
-## 工程笔记
-
-开发过程中踩到的几个**不查源码就一定会中招**的坑，记录在
-[`docs/engineering-notes.md`](docs/engineering-notes.md)，包括：
-
-- ConPTY 挂不上子进程的两个隐藏必要条件（官方样例没有体现）
-- `\r` 不是「清空当前行」，实现错了会让整份日志变成空行
-- `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` 的 `lpValue` 是句柄值本身，不是指向句柄的指针
-
----
-
 ## 开发状态与路线图
 
 当前是**可用的早期版本**，引擎部分（进程树、ConPTY、端口归属、状态机、停止三态、IPC）已有端到端测试覆盖。
@@ -182,7 +249,8 @@ WebView2 自带 `postMessage` / `WebMessageReceived` 通道，走**进程内消�
 - [x] 停止三态降级
 - [x] WebView2 面板 + IPC + 实时日志
 - [x] 拖拽排序 + CSS 变量主题
-- [ ] 沙箱化自定义卡片（用户可分享主题与卡片）
+- [x] 沙箱化自定义卡片（含安全回归测试 `tools/security-probe-card`）
+- [ ] 主题包（用户可分享的 CSS 变量集）
 - [ ] 首运向导与图形化「新建应用」
 - [ ] 面板内嵌终端（交互式输入）
 - [ ] 自动更新与 winget 发布

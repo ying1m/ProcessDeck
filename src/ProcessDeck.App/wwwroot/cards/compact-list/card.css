@@ -1,0 +1,112 @@
+/* 卡片自己的样式。宿主不注入任何 CSS —— 卡片是完全自治的。 */
+
+:root {
+  --bg: #0e1116;
+  --row: #161b22;
+  --row-hover: #1c2230;
+  --border: #262d38;
+  --fg: #e6edf3;
+  --muted: #8b949e;
+  --faint: #5b6472;
+  --accent: #3b82f6;
+  --running: #2ea043;
+  --stopped: #6e7681;
+  --starting: #d29922;
+  --failed: #f85149;
+  --font: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Consolas", monospace;
+}
+
+:root[data-theme="light"] {
+  --bg: #f6f8fa;
+  --row: #ffffff;
+  --row-hover: #f0f3f6;
+  --border: #d8dee4;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --faint: #8b949e;
+  --accent: #0969da;
+  --stopped: #a0a8b0;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 13px;
+  overflow-y: auto;
+}
+
+.rows { display: flex; flex-direction: column; gap: 6px; padding: 14px; }
+
+.row {
+  display: grid;
+  grid-template-columns: 10px minmax(120px, 1.4fr) minmax(160px, 2fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--row);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  transition: background .12s ease, border-color .12s ease;
+}
+
+.row:hover { background: var(--row-hover); border-color: #323b49; }
+
+.dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.dot.running  { background: var(--running);  color: var(--running); }
+.dot.stopped  { background: var(--stopped);  color: var(--stopped); }
+.dot.starting { background: var(--starting); color: var(--starting); animation: pulse 1.1s infinite; }
+.dot.stopping { background: var(--starting); color: var(--starting); animation: pulse 1.1s infinite; }
+.dot.failed   { background: var(--failed);   color: var(--failed); }
+
+@keyframes pulse { 50% { opacity: .3; } }
+
+.name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.detail {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail .err { color: var(--failed); font-family: var(--font); }
+
+.actions { display: flex; gap: 6px; }
+
+button {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: 7px;
+  border: 1px solid #323b49;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  transition: background .12s ease, opacity .12s ease;
+}
+
+button:hover:not(:disabled) { background: var(--row-hover); }
+
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+.hint {
+  margin: 40px 0;
+  text-align: center;
+  color: var(--faint);
+  font-size: 13px;
+}

@@ -22,10 +22,7 @@ public sealed class ConfigurationStore
     {
         FilePath = filePath
                    ?? Environment.GetEnvironmentVariable(PathOverrideEnvironmentVariable)
-                   ?? System.IO.Path.Combine(
-                       Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                       "ProcessDeck",
-                       "deck.json");
+                   ?? DeckPaths.DefaultConfigurationFile;
     }
 
     /// <summary>配置文件绝对路径。</summary>
