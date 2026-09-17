@@ -1,0 +1,27 @@
+{
+  "id": "nord",
+  "name": "Nord",
+  "description": "低对比度的冷色调配色，长时间盯着不累。只需覆盖一部分变量，其余从深色基底继承。",
+  "author": "ProcessDeck",
+  "version": "1.0.0",
+  "base": "dark",
+  "vars": {
+    "--bg": "#2e3440",
+    "--bg-elevated": "#3b4252",
+    "--bg-card": "#3b4252",
+    "--bg-card-hover": "#434c5e",
+    "--border": "#434c5e",
+    "--border-strong": "#4c566a",
+    "--fg": "#eceff4",
+    "--fg-muted": "#aebacb",
+    "--fg-faint": "#7b88a1",
+    "--accent": "#88c0d0",
+    "--accent-fg": "#2e3440",
+    "--state-running": "#a3be8c",
+    "--state-stopped": "#4c566a",
+    "--state-starting": "#ebcb8b",
+    "--state-failed": "#bf616a",
+    "--log-bg": "#272c36",
+    "--log-fg": "#b8c4d4"
+  }
+}

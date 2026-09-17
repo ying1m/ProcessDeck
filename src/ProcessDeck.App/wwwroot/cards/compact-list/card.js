@@ -51,6 +51,7 @@ window.addEventListener('message', (event) => {
   }
 
   if (message.type === 'snapshot') {
+    applyTheme(message.theme);
     render(message.apps || [], message.theme);
     return;
   }
@@ -73,11 +74,35 @@ window.addEventListener('message', (event) => {
 
 let lastSignature = '';
 
-function render(apps, theme) {
-  if (theme) {
-    document.documentElement.dataset.theme = theme;
+/** 上一次套用过的变量名，换主题时先清掉，避免残留上一个主题的颜色。 */
+const appliedThemeVars = new Set();
+
+/**
+ * 套用宿主下发的主题。
+ * 卡片拿到的是完整主题对象（含 base 与 vars），
+ * 所以用户自定义主题也能作用到卡片上，而不是只有内置深浅两套。
+ */
+function applyTheme(theme) {
+  if (!theme) {
+    return;
   }
 
+  const root = document.documentElement;
+
+  for (const name of appliedThemeVars) {
+    root.style.removeProperty(name);
+  }
+  appliedThemeVars.clear();
+
+  root.dataset.theme = theme.base === 'light' ? 'light' : 'dark';
+
+  for (const [name, value] of Object.entries(theme.vars || {})) {
+    root.style.setProperty(name, value);
+    appliedThemeVars.add(name);
+  }
+}
+
+function render(apps, theme) {
   // 增量判断：状态没变就不重建 DOM，否则按钮会闪、hover 会断。
   const signature = apps.map((a) => `${a.id}:${a.state}:${a.processes}:${JSON.stringify(a.ports || {})}:${a.error || ''}`).join('|');
   if (signature === lastSignature) {

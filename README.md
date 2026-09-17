@@ -201,6 +201,60 @@ window.addEventListener('message', (e) => {
 
 ---
 
+## 主题包
+
+主题包和卡片包一样是一个目录，放进 `%APPDATA%\ProcessDeck\themes\`：
+
+```
+nord/
+  theme.json
+```
+
+```json
+{
+  "id": "nord",
+  "name": "Nord",
+  "description": "低对比度的冷色调",
+  "author": "you",
+  "version": "1.0.0",
+  "base": "dark",
+  "vars": {
+    "--bg": "#2e3440",
+    "--bg-card": "#3b4252",
+    "--accent": "#88c0d0",
+    "--state-running": "#a3be8c"
+  }
+}
+```
+
+`base` 决定**没被覆盖**的变量从深色还是浅色继承，所以一个主题只需要写它真正想改的那几个。
+内置的 `nord` 就是一份完整例子。
+
+### 标准变量
+
+面板与卡片共用同一套变量名，主题包改的就是这些：
+
+| 变量 | 用途 |
+|---|---|
+| `--bg` / `--bg-elevated` / `--bg-card` / `--bg-card-hover` | 背景层次 |
+| `--border` / `--border-strong` | 描边 |
+| `--fg` / `--fg-muted` / `--fg-faint` | 三级文字 |
+| `--accent` / `--accent-fg` | 强调色与其上的文字色 |
+| `--state-running` / `--state-stopped` / `--state-starting` / `--state-failed` | 状态点 |
+| `--log-bg` / `--log-fg` | 终端输出区 |
+| `--radius` / `--radius-sm` / `--gap` / `--pad` | 圆角与间距 |
+| `--font` / `--font-mono` | 字体 |
+
+### 安全约束
+
+变量名必须以 `--` 开头；值里不允许出现 `url(`、`expression(`、`@import`、分号或花括号。
+
+这不是洁癖：如果一个可分享的主题能往被用作 `background` 的变量里塞 `url(...)`，
+那么别人一打开面板就会向该地址发起请求 —— 等于一个静默的「谁在用这个主题」信标。
+不合规的变量会被丢弃，并在快照的 `themeProblems` 里报告出来。
+
+---
+
 ## ⚠️ 关于杀毒软件误报
 
 这个工具天生踩杀软的命门：**启动进程、回收进程树、结束占用端口的进程**。
@@ -262,7 +316,7 @@ WebView2 自带 `postMessage` / `WebMessageReceived` 通道，走**进程内消�
 - [x] 拖拽排序 + CSS 变量主题
 - [x] 沙箱化自定义卡片（含安全回归测试 `tools/security-probe-card`）
 - [x] 首运向导与图形化新建 / 编辑应用
-- [ ] 主题包（用户可分享的 CSS 变量集）
+- [x] 主题包（可分享的 CSS 变量集，含变量值与白名单校验）
 - [ ] 面板内嵌终端（交互式输入）
 - [ ] 自动更新与 winget 发布
 

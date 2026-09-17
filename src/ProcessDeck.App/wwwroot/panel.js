@@ -24,6 +24,7 @@ const viewportEl = document.getElementById('viewport');
 const cardHost = document.getElementById('card-host');
 const cardFrame = document.getElementById('card-frame');
 const cardPicker = document.getElementById('card-picker');
+const themePicker = document.getElementById('theme-picker');
 const appForm = document.getElementById('app-form');
 const appFormTitle = document.getElementById('app-form-title');
 const appFormDelete = document.getElementById('app-form-delete');
@@ -123,9 +124,85 @@ function applySnapshot(data) {
   reconcile(ordered);
   updateSummary();
   renderCardPicker(data.cards || []);
+  renderThemePicker(data.themes || []);
+  applyTheme(data.theme || 'dark');
   applyActiveCard();
   pushToCard();
 }
+
+/* ---------------- 主题 ---------------- */
+
+/** 上一次套用过的变量名。换主题时必须先清掉，否则会残留上一个主题的颜色。 */
+const appliedThemeVars = new Set();
+
+function currentTheme() {
+  const themes = (snapshot && snapshot.themes) || [];
+  const wanted = (snapshot && snapshot.theme) || 'dark';
+
+  return themes.find((t) => t.id === wanted)
+    || themes.find((t) => t.id === 'dark')
+    || { id: 'dark', base: 'dark', vars: {} };
+}
+
+function applyTheme(themeId) {
+  const themes = (snapshot && snapshot.themes) || [];
+  const theme = themes.find((t) => t.id === themeId)
+    || themes.find((t) => t.id === 'dark')
+    || { id: 'dark', base: 'dark', vars: {} };
+
+  const root = document.documentElement;
+
+  for (const name of appliedThemeVars) {
+    root.style.removeProperty(name);
+  }
+  appliedThemeVars.clear();
+
+  // base 决定哪些「没被主题覆盖」的变量从深色还是浅色基底继承。
+  root.dataset.theme = theme.base === 'light' ? 'light' : 'dark';
+
+  for (const [name, value] of Object.entries(theme.vars || {})) {
+    root.style.setProperty(name, value);
+    appliedThemeVars.add(name);
+  }
+
+  if (themePicker.value !== theme.id) {
+    themePicker.value = theme.id;
+  }
+}
+
+function renderThemePicker(themes) {
+  const desired = themes.map((t) => t.id);
+  const current = Array.from(themePicker.options).map((o) => o.value);
+
+  if (desired.length === current.length && desired.every((id, i) => id === current[i])) {
+    return;
+  }
+
+  themePicker.textContent = '';
+
+  for (const theme of themes) {
+    const option = document.createElement('option');
+    option.value = theme.id;
+    option.textContent = theme.source === 'user' ? `${theme.name}（用户）` : theme.name;
+    if (theme.description) {
+      option.title = theme.description;
+    }
+    themePicker.appendChild(option);
+  }
+}
+
+themePicker.addEventListener('change', () => {
+  // 先本地立即套用，不等宿主回推 —— 切主题要跟手。
+  // 宿主持久化后会再推一次快照，两边最终一致。
+  applyTheme(themePicker.value);
+  pushToCard();
+
+  send({
+    type: 'savePreferences',
+    theme: themePicker.value,
+    layout: (snapshot && snapshot.layout) || null,
+  });
+});
 
 /* ---------------- 自定义卡片宿主 ---------------- */
 
@@ -293,7 +370,8 @@ function pushToCard() {
       __processdeck: true,
       type: 'snapshot',
       apps: (snapshot && snapshot.apps) || [],
-      theme: (snapshot && snapshot.theme) || 'dark',
+      // 送完整主题对象（含自定义变量），卡片才能跟随用户主题。
+      theme: currentTheme(),
     },
     '*'
   );
@@ -813,29 +891,12 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-/* ---------------- 主题 ---------------- */
-
-const btnTheme = document.getElementById('btn-theme');
-
-btnTheme.addEventListener('click', () => {
-  const root = document.documentElement;
-  const next = root.dataset.theme === 'light' ? 'dark' : 'light';
-  root.dataset.theme = next;
-  localStorage.setItem('processdeck.theme', next);
-  send({ type: 'savePreferences', theme: next, layout: (snapshot && snapshot.layout) || null });
-});
+/* ---------------- 启动 ---------------- */
 
 document.getElementById('btn-add').addEventListener('click', () => openAppForm(null));
 
-/* ---------------- 启动 ---------------- */
-
 window.addEventListener('resize', updateViewport);
 updateViewport();
-
-const savedTheme = localStorage.getItem('processdeck.theme');
-if (savedTheme) {
-  document.documentElement.dataset.theme = savedTheme;
-}
 
 if (bridge) {
   bridge.addEventListener('message', handleHostMessage);

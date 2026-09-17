@@ -5,6 +5,7 @@ using ProcessDeck.Core;
 using ProcessDeck.Core.Cards;
 using ProcessDeck.Core.Configuration;
 using ProcessDeck.Core.Supervision;
+using ProcessDeck.Core.Themes;
 
 namespace ProcessDeck.App.Services;
 
@@ -75,6 +76,12 @@ public sealed record DeckSnapshot
 
     /// <summary>卡片发现过程中的问题，用于提示用户而不是静默失败。</summary>
     public IReadOnlyList<string> CardProblems { get; init; } = Array.Empty<string>();
+
+    /// <summary>可用主题（内置深色/浅色 + 主题包）。</summary>
+    public IReadOnlyList<ThemeDescriptor> Themes { get; init; } = Array.Empty<ThemeDescriptor>();
+
+    /// <summary>主题发现与安全校验过程中的问题。</summary>
+    public IReadOnlyList<string> ThemeProblems { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>
@@ -96,6 +103,8 @@ public sealed class DeckHostService : IDisposable
 
     private IReadOnlyList<CardDescriptor> _cards = Array.Empty<CardDescriptor>();
     private IReadOnlyList<string> _cardProblems = Array.Empty<string>();
+    private IReadOnlyList<ThemeDescriptor> _themes = ThemeCatalog.BuiltIn;
+    private IReadOnlyList<string> _themeProblems = Array.Empty<string>();
 
     private bool _disposed;
 
@@ -146,6 +155,7 @@ public sealed class DeckHostService : IDisposable
             LoadError = error;
 
             RefreshCards();
+            RefreshThemes();
 
             foreach (var definition in Configuration.Apps)
             {
@@ -166,6 +176,8 @@ public sealed class DeckHostService : IDisposable
         string? loadError;
         IReadOnlyList<CardDescriptor> cards;
         IReadOnlyList<string> cardProblems;
+        IReadOnlyList<ThemeDescriptor> themes;
+        IReadOnlyList<string> themeProblems;
 
         lock (_gate)
         {
@@ -174,6 +186,8 @@ public sealed class DeckHostService : IDisposable
             loadError = LoadError;
             cards = _cards;
             cardProblems = _cardProblems;
+            themes = _themes;
+            themeProblems = _themeProblems;
         }
 
         var apps = new List<AppSnapshot>(supervisors.Count);
@@ -235,6 +249,8 @@ public sealed class DeckHostService : IDisposable
             EngineState = $"共 {apps.Count} 个应用 · 运行中 {running} · 异常 {failed}",
             Cards = cards,
             CardProblems = cardProblems,
+            Themes = themes,
+            ThemeProblems = themeProblems,
         };
     }
 
@@ -263,6 +279,29 @@ public sealed class DeckHostService : IDisposable
 
         _cards = CardCatalog.Discover(roots, out var problems);
         _cardProblems = problems;
+    }
+
+    /// <summary>
+    /// 扫描内置与用户主题目录。
+    /// 主题只提供 CSS 变量值，不注入任何代码；值的白名单校验在 <see cref="ThemeCatalog"/> 里。
+    /// </summary>
+    private void RefreshThemes()
+    {
+        var roots = new[]
+        {
+            new ThemeRoot(
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "themes"),
+                "builtin",
+                "内置"),
+
+            new ThemeRoot(
+                DeckPaths.UserThemesDirectory,
+                "user",
+                "用户"),
+        };
+
+        _themes = ThemeCatalog.Discover(roots, out var problems);
+        _themeProblems = problems;
     }
 
     // ------------------------------------------------------------------

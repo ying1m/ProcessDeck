@@ -23,6 +23,10 @@
   --state-starting:#d29922;
   --state-failed:  #f85149;
 
+  /* 终端输出区的配色。单独成变量，主题才能把日志区一起改掉。 */
+  --log-bg:        #0b0f14;
+  --log-fg:        #9fb0c4;
+
   --radius:        12px;
   --radius-sm:     8px;
   --gap:           14px;
@@ -46,6 +50,9 @@
 
   --accent:        #0969da;
   --state-stopped: #a0a8b0;
+
+  --log-bg:        #f6f8fa;
+  --log-fg:        #4a5560;
 }
 
 * { box-sizing: border-box; }
@@ -191,21 +198,19 @@ body {
 .mono { font-family: var(--font-mono); }
 
 .card-log {
-  background: #0b0f14;
+  background: var(--log-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 9px 11px;
   font-family: var(--font-mono);
   font-size: 11.5px;
   line-height: 1.55;
-  color: #9fb0c4;
+  color: var(--log-fg);
   height: 92px;
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-all;
 }
-
-:root[data-theme="light"] .card-log { background: #f6f8fa; color: #4a5560; }
 
 .card-actions { display: flex; gap: 7px; }
 .card-actions .spacer { flex: 1; }
@@ -328,8 +333,9 @@ body {
   background: var(--bg);
 }
 
-/* 卡片选择器外观对齐按钮 */
-#card-picker {
+/* 卡片 / 主题选择器外观对齐按钮 */
+#card-picker,
+#theme-picker {
   appearance: none;
   padding-right: 26px;
   background-image: linear-gradient(45deg, transparent 50%, var(--fg-muted) 50%),
@@ -340,7 +346,8 @@ body {
   color: var(--fg-muted);
 }
 
-#card-picker option {
+#card-picker option,
+#theme-picker option {
   background: var(--bg-elevated);
   color: var(--fg);
 }
