@@ -122,6 +122,22 @@ dotnet run --project src/ProcessDeck.App
 **要求**：.NET 10 SDK、Windows 10 1809+（ConPTY 需要）、WebView2 运行时（Win11 与较新 Win10 自带）。
 不需要 Rust、不需要 C++ 工具链、不需要任何第三方 NuGet 包（只依赖 `Microsoft.Web.WebView2`）。
 
+### 5. 打包发布
+
+```powershell
+# 自包含：目标机器不需要预装 .NET（约 173 MB / 解压后）
+dotnet publish src/ProcessDeck.App -c Release -r win-x64 --self-contained true -o publish/ProcessDeck
+
+# 框架依赖：体积小得多，但目标机器需要装 .NET 10 Desktop Runtime
+dotnet publish src/ProcessDeck.App -c Release -r win-x64 --self-contained false -o publish/ProcessDeck-fd
+```
+
+应用图标由 `tools/make-icon.ps1` 生成（用 Windows PowerShell 5.1 跑，它自带 System.Drawing）。
+
+> **为什么自包含产物这么大**：WPF 不支持 IL 裁剪（`PublishTrimmed` 对 WPF 无效），
+> 所以必须整个带上 .NET 桌面运行时。这是 WPF 的固有代价，不是配置问题。
+> 想要小体积就用框架依赖模式。
+
 ---
 
 ## 自定义卡片

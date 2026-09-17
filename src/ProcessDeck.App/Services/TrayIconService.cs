@@ -17,7 +17,7 @@ public sealed class TrayIconService : IDisposable
     {
         _notifyIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadApplicationIcon(),
             Text = "ProcessDeck",
             Visible = true,
         };
@@ -29,6 +29,34 @@ public sealed class TrayIconService : IDisposable
 
         _notifyIcon.ContextMenuStrip = menu;
         _notifyIcon.DoubleClick += (_, _) => ShowRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// 从自身可执行文件里取出嵌入的图标（由 &lt;ApplicationIcon&gt; 打进 exe）。
+    /// 取不到就退回系统默认图标 —— 托盘没有图标比图标难看更糟。
+    /// </summary>
+    private static Icon LoadApplicationIcon()
+    {
+        try
+        {
+            var executablePath = Environment.ProcessPath;
+
+            if (!string.IsNullOrEmpty(executablePath))
+            {
+                var extracted = Icon.ExtractAssociatedIcon(executablePath);
+
+                if (extracted is not null)
+                {
+                    return extracted;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // 忽略：下面有兜底。
+        }
+
+        return SystemIcons.Application;
     }
 
     /// <summary>用户要求把面板唤到前台。</summary>

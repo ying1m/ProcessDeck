@@ -14,6 +14,8 @@
     <RootNamespace>ProcessDeck.App</RootNamespace>
     <!-- 必需：高 DPI 感知声明，否则 WebView2 视口尺寸会大于窗口（见 app.manifest 内注释）。 -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- 由 tools/make-icon.ps1 生成。托盘、任务栏、桌面快捷方式都用它。 -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <Product>ProcessDeck</Product>
     <Description>可自定义面板的本地应用进程管理器</Description>
     <Version>0.1.0</Version>
