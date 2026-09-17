@@ -101,17 +101,41 @@
           <input id="f-description" type="text" placeholder="可选，显示在卡片上" />
         </label>
 
-        <label class="field">
-          <span>启动命令 <b class="req">*</b></span>
-          <textarea id="f-start" rows="2" spellcheck="false"
-                    placeholder="原样交给系统执行，不做转义改写。例如：cmd.exe /c pnpm dev"></textarea>
-        </label>
+        <div class="field">
+          <span>运行环境</span>
+          <div class="chip-row" id="f-runtimes"></div>
+          <p class="field-hint" id="f-runtime-hint"></p>
+        </div>
 
-        <label class="field">
+        <div class="field">
+          <span class="field-label">
+            启动命令 <b class="req">*</b>
+            <span class="seg" id="f-start-mode">
+              <button type="button" class="seg-btn is-active" data-mode="simple">简易</button>
+              <button type="button" class="seg-btn" data-mode="detailed">详细</button>
+            </span>
+          </span>
+
+          <div id="f-start-simple">
+            <textarea id="f-start-body" rows="2" spellcheck="false"></textarea>
+            <p class="field-preview">实际执行：<code class="mono" id="f-start-preview"></code></p>
+          </div>
+
+          <textarea id="f-start" rows="3" spellcheck="false" hidden></textarea>
+
+          <p class="field-warn" id="f-start-warn" hidden></p>
+        </div>
+
+        <div class="field">
           <span>停止命令</span>
           <textarea id="f-stop" rows="2" spellcheck="false"
-                    placeholder="可选。留空则停止时先尝试 Ctrl+C，最后强制回收"></textarea>
-        </label>
+                    placeholder='例如 pg_ctl stop -D data，或 cmd.exe /c pnpm stop'></textarea>
+          <p class="field-hint">
+            可选。规则与启动命令<b>完全一样</b>：同样原样交给系统执行、中间没有 shell，
+            也同样使用上面的工作目录与环境变量。
+            留空则停止时先发 Ctrl+C，最后强制回收整棵进程树。
+          </p>
+        </div>
 
         <label class="field">
           <span>工作目录</span>

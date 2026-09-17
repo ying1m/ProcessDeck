@@ -38,6 +38,7 @@ const formFields = {
   name: document.getElementById('f-name'),
   description: document.getElementById('f-description'),
   start: document.getElementById('f-start'),
+  startBody: document.getElementById('f-start-body'),
   stop: document.getElementById('f-stop'),
   cwd: document.getElementById('f-cwd'),
   port: document.getElementById('f-port'),
@@ -819,6 +820,209 @@ document.getElementById('terminal-close').addEventListener('click', closeTermina
 
 let editingAppId = null;
 
+/* ---------------- 运行环境 + 简易 / 详细两种写法 ----------------
+   「简易」只是少打字的输入方式：它一定会被拼成完整的命令行再保存。
+   配置里永远只存完整命令行，实际运行的也是它 ——
+   简易与详细之间不存在第二套语义，来回切换不会改变行为。 */
+
+const runtimeChipRow = document.getElementById('f-runtimes');
+const runtimeHint = document.getElementById('f-runtime-hint');
+const startSimpleBox = document.getElementById('f-start-simple');
+const startPreview = document.getElementById('f-start-preview');
+const startWarn = document.getElementById('f-start-warn');
+const startModeSeg = document.getElementById('f-start-mode');
+
+const RUNTIMES = [
+  {
+    id: 'direct',
+    label: '直接运行程序',
+    hint: '填完整的程序名与参数。exe、dotnet、python 这类本身就可执行的用这一项。',
+    placeholder: '例如 python -m http.server 8000 --bind 127.0.0.1',
+    compose: (body) => body,
+    parsePrefixes: [],
+  },
+  {
+    id: 'powershell',
+    label: 'PowerShell',
+    hint: '直接写 PowerShell 语句，不必自己写 powershell.exe。命令里的引号尽量用单引号。',
+    placeholder: '例如 Get-Process | Select-Object -First 5',
+    compose: (body) => `powershell -NoProfile -ExecutionPolicy Bypass -Command "${body}"`,
+    parsePrefixes: [
+      'powershell -NoProfile -ExecutionPolicy Bypass -Command "',
+      'powershell -NoProfile -Command "',
+      'powershell -Command "',
+    ],
+    suffix: '"',
+  },
+  {
+    id: 'pwsh',
+    label: 'PowerShell 7',
+    hint: '同上，但用 PowerShell 7（pwsh.exe）。',
+    placeholder: '例如 Get-ChildItem | Measure-Object',
+    compose: (body) => `pwsh -NoProfile -ExecutionPolicy Bypass -Command "${body}"`,
+    parsePrefixes: [
+      'pwsh -NoProfile -ExecutionPolicy Bypass -Command "',
+      'pwsh -NoProfile -Command "',
+      'pwsh -Command "',
+    ],
+    suffix: '"',
+  },
+  {
+    id: 'cmd',
+    label: 'cmd / 批处理',
+    hint: 'npm、pnpm、yarn、.bat 必须走这一项 —— 它们是 .cmd 脚本而不是可执行文件，直接写会启动失败。',
+    placeholder: '例如 pnpm dev',
+    compose: (body) => `cmd.exe /c "${body}"`,
+    parsePrefixes: ['cmd.exe /c "', 'cmd /c "'],
+    suffix: '"',
+  },
+  {
+    id: 'python',
+    label: 'Python 代码',
+    hint: '写 Python 代码片段，会自动包成 python -c "..."。',
+    placeholder: '例如 import sys; print(sys.version)',
+    compose: (body) => `python -c "${body}"`,
+    parsePrefixes: ['python -c "'],
+    suffix: '"',
+  },
+  {
+    id: 'node',
+    label: 'Node.js 代码',
+    hint: '写 JS 片段，会自动包成 node -e "..."。',
+    placeholder: '例如 console.log(process.version)',
+    compose: (body) => `node -e "${body}"`,
+    parsePrefixes: ['node -e "'],
+    suffix: '"',
+  },
+];
+
+let startRuntimeId = 'direct';
+let startMode = 'simple';
+
+function currentRuntime() {
+  return RUNTIMES.find((r) => r.id === startRuntimeId) || RUNTIMES[0];
+}
+
+/** 从完整命令行反推运行环境与简易内容。匹配不上就退回详细方式。 */
+function parseStartCommand(command) {
+  const text = (command || '').trim();
+
+  if (!text) {
+    return { runtimeId: 'direct', body: '', mode: 'simple' };
+  }
+
+  for (const runtime of RUNTIMES) {
+    for (const prefix of runtime.parsePrefixes || []) {
+      if (!text.startsWith(prefix)) {
+        continue;
+      }
+
+      let body = text.slice(prefix.length);
+
+      if (runtime.suffix && body.endsWith(runtime.suffix)) {
+        body = body.slice(0, -runtime.suffix.length);
+      }
+
+      return { runtimeId: runtime.id, body, mode: 'simple' };
+    }
+  }
+
+  return { runtimeId: 'direct', body: text, mode: 'detailed' };
+}
+
+/** 编辑器内容对应的完整命令行。保存与预览共用它，保证只有一个事实来源。 */
+function composeStartCommand() {
+  if (startMode === 'detailed') {
+    return formFields.start.value.trim();
+  }
+
+  return currentRuntime().compose(formFields.startBody.value.trim()).trim();
+}
+
+/** 供模板调用：指定运行环境并填入简易内容。 */
+function setStartEditor(runtimeId, body) {
+  startRuntimeId = runtimeId;
+  startMode = 'simple';
+  formFields.startBody.value = body;
+  renderStartEditor();
+}
+
+function renderStartEditor() {
+  const runtime = currentRuntime();
+
+  runtimeChipRow.textContent = '';
+
+  for (const item of RUNTIMES) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `chip${item.id === startRuntimeId ? ' is-active' : ''}`;
+    chip.textContent = item.label;
+
+    chip.addEventListener('click', () => {
+      // 从详细切过来时，把已经写好的内容当作简易内容接过去，不让用户白写一遍。
+      if (startMode === 'detailed' && formFields.start.value.trim()) {
+        formFields.startBody.value = formFields.start.value.trim();
+      }
+
+      startRuntimeId = item.id;
+      startMode = 'simple';
+      renderStartEditor();
+    });
+
+    runtimeChipRow.appendChild(chip);
+  }
+
+  for (const button of startModeSeg.querySelectorAll('.seg-btn')) {
+    button.classList.toggle('is-active', button.dataset.mode === startMode);
+  }
+
+  const simple = startMode === 'simple';
+  startSimpleBox.hidden = !simple;
+  formFields.start.hidden = simple;
+
+  formFields.startBody.placeholder = runtime.placeholder || '';
+  runtimeHint.textContent = runtime.hint || '';
+
+  const composed = composeStartCommand();
+  startPreview.textContent = composed || '（还没有内容）';
+
+  // 简易内容里出现双引号时，拼出来的命令行会被提前截断 —— 必须当场说清楚，
+  // 否则用户只会看到一个莫名其妙的启动失败。
+  const body = formFields.startBody.value;
+  const quoteRisk = simple && body.includes('"') && runtime.id !== 'direct';
+
+  startWarn.hidden = !quoteRisk;
+  startWarn.textContent = quoteRisk
+    ? '简易内容里出现了双引号，拼出来的命令行可能被提前截断。请改用单引号，或切到「详细」自己写完整命令行。'
+    : '';
+}
+
+for (const button of startModeSeg.querySelectorAll('.seg-btn')) {
+  button.addEventListener('click', () => {
+    const next = button.dataset.mode;
+
+    if (next === startMode) {
+      return;
+    }
+
+    if (next === 'detailed') {
+      // 切到详细：把当前拼好的命令行填进去当起点。
+      formFields.start.value = composeStartCommand();
+    } else if (formFields.start.value.trim()) {
+      // 切回简易：从详细内容反推运行环境与内容。
+      const parsed = parseStartCommand(formFields.start.value);
+      startRuntimeId = parsed.runtimeId;
+      formFields.startBody.value = parsed.body;
+    }
+
+    startMode = next;
+    renderStartEditor();
+  });
+}
+
+formFields.startBody.addEventListener('input', renderStartEditor);
+formFields.start.addEventListener('input', renderStartEditor);
+
 const TEMPLATES = [
   {
     id: '',
@@ -830,7 +1034,7 @@ const TEMPLATES = [
     label: 'Node / pnpm dev',
     apply: () => {
       formFields.name.value = '前端 dev server';
-      formFields.start.value = 'cmd.exe /c pnpm dev';
+      setStartEditor('cmd', 'pnpm dev');
       formFields.port.value = '5173';
       formFields.readiness.value = 'Port';
     },
@@ -840,7 +1044,7 @@ const TEMPLATES = [
     label: '.NET 项目',
     apply: () => {
       formFields.name.value = 'API 服务';
-      formFields.start.value = 'dotnet run --project .';
+      setStartEditor('direct', 'dotnet run --project .');
       formFields.port.value = '5000';
       formFields.readiness.value = 'Http';
       formFields.url.value = 'http://127.0.0.1:5000/';
@@ -851,7 +1055,7 @@ const TEMPLATES = [
     label: 'Python 静态服务',
     apply: () => {
       formFields.name.value = '静态网页服务';
-      formFields.start.value = 'python -m http.server 8000 --bind 127.0.0.1';
+      setStartEditor('direct', 'python -m http.server 8000 --bind 127.0.0.1');
       formFields.port.value = '8000';
       formFields.readiness.value = 'Port';
     },
@@ -861,7 +1065,16 @@ const TEMPLATES = [
     label: 'PowerShell 脚本',
     apply: () => {
       formFields.name.value = '自定义脚本';
-      formFields.start.value = 'powershell -NoProfile -ExecutionPolicy Bypass -File .\\run.ps1';
+      setStartEditor('powershell', '& .\\run.ps1');
+      formFields.readiness.value = 'None';
+    },
+  },
+  {
+    id: 'powershell-inline',
+    label: 'PowerShell 命令',
+    apply: () => {
+      formFields.name.value = '自定义命令';
+      setStartEditor('powershell', 'Get-Date');
       formFields.readiness.value = 'None';
     },
   },
@@ -909,7 +1122,16 @@ function openAppForm(appId) {
   formFields.template.value = '';
   formFields.name.value = definition ? definition.name || '' : '';
   formFields.description.value = definition ? definition.description || '' : '';
-  formFields.start.value = definition ? definition.startCommand || '' : '';
+
+  // 启动命令：先试着从已有的完整命令行反推出运行环境与简易内容；
+  // 推不出来就落到详细方式，把原文原样交给用户。
+  const startText = definition ? definition.startCommand || '' : '';
+  const parsedStart = parseStartCommand(startText);
+  startRuntimeId = parsedStart.runtimeId;
+  startMode = parsedStart.mode;
+  formFields.start.value = startText;
+  formFields.startBody.value = parsedStart.body;
+
   formFields.stop.value = definition ? definition.stopCommand || '' : '';
   formFields.cwd.value = definition ? definition.workingDirectory || '' : '';
   formFields.port.value = definition && definition.port ? String(definition.port) : '';
@@ -923,6 +1145,7 @@ function openAppForm(appId) {
   formFields.autostart.checked = !!(definition && definition.autoStart);
 
   updateReadinessFields();
+  renderStartEditor();
   appForm.hidden = false;
   formFields.name.focus();
 }
@@ -934,7 +1157,9 @@ function closeAppForm() {
 
 function submitAppForm() {
   const name = formFields.name.value.trim();
-  const startCommand = formFields.start.value.trim();
+
+  // 简易方式在这里被拼成完整命令行；保存的永远是完整命令行。
+  const startCommand = composeStartCommand();
 
   if (!name) {
     showToast('请填写名称', 'error');
@@ -944,7 +1169,7 @@ function submitAppForm() {
 
   if (!startCommand) {
     showToast('请填写启动命令', 'error');
-    formFields.start.focus();
+    (startMode === 'simple' ? formFields.startBody : formFields.start).focus();
     return;
   }
 
