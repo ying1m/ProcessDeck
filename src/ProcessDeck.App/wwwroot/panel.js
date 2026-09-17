@@ -48,6 +48,7 @@ const formFields = {
   url: document.getElementById('f-url'),
   pattern: document.getElementById('f-pattern'),
   autostart: document.getElementById('f-autostart'),
+  hidewindow: document.getElementById('f-hidewindow'),
 };
 
 const STATE_LABEL = {
@@ -1143,6 +1144,7 @@ function openAppForm(appId) {
   formFields.url.value = readiness.url || '';
   formFields.pattern.value = readiness.pattern || '';
   formFields.autostart.checked = !!(definition && definition.autoStart);
+  formFields.hidewindow.checked = !!(definition && definition.hideWindow);
 
   updateReadinessFields();
   renderStartEditor();
@@ -1208,6 +1210,7 @@ function submitAppForm() {
       stopTimeoutSeconds: Number(formFields.stopTimeout.value) || 15,
       startGraceSeconds: 2,
       autoStart: formFields.autostart.checked,
+      hideWindow: formFields.hidewindow.checked,
       readiness,
     },
   });

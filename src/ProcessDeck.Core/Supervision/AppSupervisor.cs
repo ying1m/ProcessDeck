@@ -29,6 +29,7 @@ public sealed class AppSupervisor : IDisposable
 
     private SupervisedProcess? _process;
     private TerminalOutputBuffer? _output;
+    private HiddenDesktop? _hiddenDesktop;
     private AppState _state = AppState.Stopped;
     private string? _lastError;
     private StopStage _lastStopStage = StopStage.None;
@@ -304,8 +305,27 @@ public sealed class AppSupervisor : IDisposable
 
         // ---- 拉起进程 ----
         SupervisedProcess process;
+
         try
         {
+            // 选择「完全隐藏窗口」时，先把不可见桌面建出来。
+            // 桌面名每次都不同：同名桌面会创建失败，带随机后缀还能避开
+            // 上一次异常退出残留的桌面把这一次挡住。
+            var desktopName = Definition.HideWindow
+                ? BuildDesktopName()
+                : null;
+
+            if (desktopName is not null)
+            {
+                var desktop = new HiddenDesktop(desktopName);
+
+                lock (_gate)
+                {
+                    _hiddenDesktop?.Dispose();
+                    _hiddenDesktop = desktop;
+                }
+            }
+
             var options = new LaunchOptions
             {
                 CommandLine = Definition.StartCommand,
@@ -314,6 +334,7 @@ public sealed class AppSupervisor : IDisposable
                 UsePseudoConsole = true,
                 ConsoleColumns = 120,
                 ConsoleRows = 30,
+                DesktopName = desktopName,
                 DisplayName = $"processdeck-{Definition.Id}",
             };
 
@@ -321,6 +342,7 @@ public sealed class AppSupervisor : IDisposable
         }
         catch (Exception ex)
         {
+            ReleaseHiddenDesktop();
             Fail($"启动失败：{ex.Message}");
             return;
         }
@@ -466,6 +488,8 @@ public sealed class AppSupervisor : IDisposable
 
         // SupervisedProcess.Dispose 会关闭作业句柄 → 内核回收整棵进程树。
         process?.Dispose();
+
+        ReleaseHiddenDesktop();
     }
 
     // ------------------------------------------------------------------
@@ -721,6 +745,8 @@ public sealed class AppSupervisor : IDisposable
         // 关作业句柄 → 整棵树由内核回收；ConPTY 会话与输出泵一并收尾。
         process.Dispose();
 
+        ReleaseHiddenDesktop();
+
         // 注意：_output 刻意保留，停止后 UI 仍能显示最后一次运行的日志。
         SetState(AppState.Stopped);
     }
@@ -728,6 +754,33 @@ public sealed class AppSupervisor : IDisposable
     // ------------------------------------------------------------------
     // 状态与通知
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// 生成一个唯一的不可见桌面名。
+    /// 桌面名上限很短，所以这里做了截断；同时带上随机后缀，
+    /// 避免与上一次运行残留的桌面同名而创建失败。
+    /// </summary>
+    private string BuildDesktopName()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var id = Definition.Id.Length > 20 ? Definition.Id[..20] : Definition.Id;
+
+        return $"PD-{id}-{suffix}";
+    }
+
+    /// <summary>释放不可见桌面句柄。桌面上的进程不受影响，只是我们不再持有它。</summary>
+    private void ReleaseHiddenDesktop()
+    {
+        HiddenDesktop? desktop;
+
+        lock (_gate)
+        {
+            desktop = _hiddenDesktop;
+            _hiddenDesktop = null;
+        }
+
+        desktop?.Dispose();
+    }
 
     private string? ResolveWorkingDirectory()
     {

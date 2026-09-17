@@ -101,6 +101,19 @@ public sealed class AppDefinition
     /// <summary>ProcessDeck 启动时是否自动拉起。</summary>
     public bool AutoStart { get; set; }
 
+    /// <summary>
+    /// 是否让整个进程树运行在一个**不可见的 Win32 桌面**上。
+    ///
+    /// 用途：有些程序会自己再拉起子进程并给它们开控制台窗口
+    /// （脚本里的 <c>Start-Process -WindowStyle Minimized</c>，
+    /// 或 Node 用 <c>detached: true</c> 派生）—— 这类窗口用启动标志管不到，
+    /// 因为它们是被启动程序自己开的。把整棵树放到另一个桌面上就能全部隐掉。
+    ///
+    /// 代价：被放上去的程序**无法显示任何界面** —— 托盘图标、对话框、窗口都出不来。
+    /// 只适合真正的后台服务。
+    /// </summary>
+    public bool HideWindow { get; set; }
+
     /// <summary>面板上的强调色（可选），交给前端自由使用。</summary>
     public string? Accent { get; set; }
 

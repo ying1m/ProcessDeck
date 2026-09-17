@@ -184,6 +184,15 @@
           <input id="f-autostart" type="checkbox" />
           <span>ProcessDeck 启动时自动拉起</span>
         </label>
+
+        <label class="field checkbox">
+          <input id="f-hidewindow" type="checkbox" />
+          <span>完全隐藏窗口（整个进程树放到不可见桌面）</span>
+        </label>
+        <p class="field-hint">
+          用来对付「程序自己又拉起 cmd / PowerShell 窗口」这类情况 —— 那些窗口用启动参数管不到。
+          开启后该程序<b>无法显示任何界面</b>（托盘图标、对话框都出不来），只适合后台服务。
+        </p>
       </div>
 
       <footer class="modal-foot">

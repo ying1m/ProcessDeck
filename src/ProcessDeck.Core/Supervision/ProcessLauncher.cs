@@ -49,6 +49,15 @@ public sealed record LaunchOptions
     /// <summary>伪控制台初始行数。</summary>
     public short ConsoleRows { get; init; } = 30;
 
+    /// <summary>
+    /// 把进程放到哪个 Win32 桌面上运行。null 表示当前桌面（窗口会显示出来）。
+    ///
+    /// 填一个由 <see cref="HiddenDesktop"/> 创建的名字，整棵进程树（含孙进程）
+    /// 创建的窗口都会落在那个不可见桌面上。这是唯一能管住「孙进程自己开窗口」的手段 ——
+    /// 创建标志只管得到被直接启动的那个进程。
+    /// </summary>
+    public string? DesktopName { get; init; }
+
     /// <summary>可选诊断名，仅用于作业对象标识。</summary>
     public string? DisplayName { get; init; }
 }
@@ -288,6 +297,10 @@ public static class ProcessLauncher
                 StartupInfo = new STARTUPINFO
                 {
                     cb = Marshal.SizeOf<STARTUPINFOEX>(),
+
+                    // 非 null 时，本进程与它派生出的所有后代都运行在那个桌面上，
+                    // 它们创建的窗口用户完全看不到。
+                    lpDesktop = options.DesktopName,
                 },
                 lpAttributeList = IntPtr.Zero,
             };

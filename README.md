@@ -98,6 +98,7 @@ ProcessDeck 就是这块缺口。
 | `stopTimeoutSeconds` | number | 优雅停止的最长等待，默认 15 |
 | `startGraceSeconds` | number | 无探针时，进程存活多久算就绪，默认 2 |
 | `autoStart` | boolean | ProcessDeck 启动时自动拉起 |
+| `hideWindow` | boolean | 让整个进程树跑在不可见桌面上（见下文「隐藏程序自己弹出来的窗口」） |
 
 ### 3. 也可以用界面完成
 
@@ -269,6 +270,56 @@ nord/
 这不是洁癖：如果一个可分享的主题能往被用作 `background` 的变量里塞 `url(...)`，
 那么别人一打开面板就会向该地址发起请求 —— 等于一个静默的「谁在用这个主题」信标。
 不合规的变量会被丢弃，并在快照的 `themeProblems` 里报告出来。
+
+---
+
+## 隐藏程序自己弹出来的控制台窗口
+
+**先说清楚**：ProcessDeck 自己的启动路径**不产生任何窗口** ——
+它用 ConPTY 伪控制台承载进程，实测启动后可见窗口数为 0。
+
+那为什么还会看到 PowerShell / cmd 窗口？因为**被启动的程序自己又开了一个**。常见两种写法：
+
+```powershell
+# 脚本里这样写 —— Minimized 仍然是"可见"，只是最小化了
+Start-Process -FilePath 'cmd.exe' -ArgumentList '/c','...' -WindowStyle Minimized
+```
+
+```js
+// Node 这样派生 —— Windows 上 detached 会让子进程拥有自己的控制台窗口
+spawn(cmd, args, { detached: true, stdio: 'ignore' })
+```
+
+这类窗口**用启动标志管不到**，因为它们是孙进程自己创建的。
+
+### 解法一：改脚本（推荐，零代价）
+
+把 `-WindowStyle Minimized` 换成下面任意一种，实测可见窗口从 1 个降到 0 个：
+
+```powershell
+-WindowStyle Hidden     # 窗口存在但隐藏
+-NoNewWindow            # 复用父进程的控制台，不新建
+```
+
+Node 侧则加 `windowsHide: true`。
+
+### 解法二：在 ProcessDeck 里勾选「完全隐藏窗口」
+
+应用定义里把 `hideWindow` 设为 `true`，整个进程树会被放到一个**不可见的 Win32 桌面**上。
+窗口真实存在，只是永远不在你当前的桌面上，所以既看不见也点不到。
+
+实测对比（同一个会自开窗口的孙进程，走 `AppSupervisor` 真实路径）：
+
+| | 孙进程可见窗口 | 程序是否照常运行 | 停止后残留 |
+|---|---|---|---|
+| `hideWindow: false` | 1 个 | ✅ | 0 |
+| `hideWindow: true` | **0 个** | ✅ | 0 |
+
+**代价必须知道**：被放上去的程序**无法显示任何界面** —— 托盘图标、对话框、窗口全都出不来。
+只适合真正的后台服务，不适合需要你点一下的程序。
+
+> 怎么选：能改脚本就改脚本；改不了（第三方程序、不想动别人的脚本）
+> 或者情况复杂（一堆孙进程各自开窗）就用 `hideWindow`。
 
 ---
 

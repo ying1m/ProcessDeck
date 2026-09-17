@@ -18,7 +18,7 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <Product>ProcessDeck</Product>
     <Description>可自定义面板的本地应用进程管理器</Description>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <!--
       WFO0003：WinForms 分析器建议改用 ApplicationHighDpiMode 属性。
       但那是 WinForms 的机制，本项目是 WPF 应用（仅借用 WinForms 的托盘图标），

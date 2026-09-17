@@ -180,4 +180,27 @@ internal static class NativeMethods
         out IntPtr hWritePipe,
         ref SECURITY_ATTRIBUTES lpPipeAttributes,
         uint nSize);
+
+    // ---------- user32: 不可见桌面 ----------
+    //
+    // 用途：把被启动的进程树整体放到一个永远不会被切换到的 Win32 桌面上。
+    // 这样它以及它派生出的**所有**孙进程创建的窗口都在那个桌面上，
+    // 用户完全看不到 —— 这是唯一能覆盖「孙进程自己开新控制台」的通用手段，
+    // 靠 CreateProcess 的创建标志是管不住孙进程的。
+
+    /// <summary>DESKTOP_ALL_ACCESS 的常用近似值。</summary>
+    public const uint DESKTOP_GENERIC_ALL = 0x10000000;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr CreateDesktopW(
+        string lpszDesktop,
+        string? lpszDevice,
+        IntPtr pDevmode,
+        uint dwFlags,
+        uint dwDesiredAccess,
+        IntPtr lpsa);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool CloseDesktop(IntPtr hDesktop);
 }
