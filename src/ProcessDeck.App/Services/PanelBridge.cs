@@ -193,6 +193,30 @@ public sealed class PanelBridge : IDisposable
                     _host.Reload();
                     break;
 
+                case "openConfigFolder":
+                    _host.OpenConfigFolder();
+                    break;
+
+                case "saveApp":
+                {
+                    // 面板传来的定义一律当作不可信输入：先反序列化，
+                    // 再走与手改 JSON 完全相同的校验路径（AppDefinition.Validate）。
+                    var definition = root?["app"]
+                        ?.Deserialize<ProcessDeck.Core.Configuration.AppDefinition>(DeckJson.Options);
+
+                    if (definition is null)
+                    {
+                        throw new InvalidOperationException("saveApp 消息缺少 app 字段。");
+                    }
+
+                    _host.TrySaveApp(definition);
+                    break;
+                }
+
+                case "deleteApp":
+                    await _host.DeleteAppAsync(RequireString(root, "appId")).ConfigureAwait(false);
+                    break;
+
                 case "ensureConfigFile":
                     _host.EnsureConfigurationFile();
                     break;

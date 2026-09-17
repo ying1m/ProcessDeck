@@ -50,6 +50,100 @@
     <span id="viewport" class="mono"></span>
   </footer>
 
+  <!-- 新建 / 编辑应用表单 -->
+  <div class="modal-backdrop" id="app-form" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="app-form-title">
+      <header class="modal-head">
+        <h2 id="app-form-title">新建应用</h2>
+        <button class="btn tiny ghost" id="app-form-close" title="关闭">✕</button>
+      </header>
+
+      <div class="modal-body">
+        <label class="field" id="field-template">
+          <span>从模板快速开始</span>
+          <select id="f-template"></select>
+        </label>
+
+        <label class="field">
+          <span>名称 <b class="req">*</b></span>
+          <input id="f-name" type="text" placeholder="例如：前端 dev server" />
+        </label>
+
+        <label class="field">
+          <span>说明</span>
+          <input id="f-description" type="text" placeholder="可选，显示在卡片上" />
+        </label>
+
+        <label class="field">
+          <span>启动命令 <b class="req">*</b></span>
+          <textarea id="f-start" rows="2" spellcheck="false"
+                    placeholder="原样交给系统执行，不做转义改写。例如：cmd.exe /c pnpm dev"></textarea>
+        </label>
+
+        <label class="field">
+          <span>停止命令</span>
+          <textarea id="f-stop" rows="2" spellcheck="false"
+                    placeholder="可选。留空则停止时先尝试 Ctrl+C，最后强制回收"></textarea>
+        </label>
+
+        <label class="field">
+          <span>工作目录</span>
+          <input id="f-cwd" type="text" spellcheck="false"
+                 placeholder="可选，支持 %USERPROFILE% 这类环境变量" />
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>端口</span>
+            <input id="f-port" type="number" min="1" max="65535" placeholder="可选" />
+          </label>
+          <label class="field">
+            <span>优雅停止超时（秒）</span>
+            <input id="f-stoptimeout" type="number" min="1" max="600" value="15" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>就绪判定</span>
+            <select id="f-readiness">
+              <option value="None">进程存活即可</option>
+              <option value="Port">端口开始监听</option>
+              <option value="Http">HTTP 返回成功</option>
+              <option value="Log">终端输出匹配</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>就绪超时（秒）</span>
+            <input id="f-timeout" type="number" min="1" max="1800" value="60" />
+          </label>
+        </div>
+
+        <label class="field" id="field-url" hidden>
+          <span>健康检查地址</span>
+          <input id="f-url" type="text" spellcheck="false" placeholder="http://127.0.0.1:8080/health" />
+        </label>
+
+        <label class="field" id="field-pattern" hidden>
+          <span>日志匹配正则</span>
+          <input id="f-pattern" type="text" spellcheck="false" placeholder="listening on|ready in" />
+        </label>
+
+        <label class="field checkbox">
+          <input id="f-autostart" type="checkbox" />
+          <span>ProcessDeck 启动时自动拉起</span>
+        </label>
+      </div>
+
+      <footer class="modal-foot">
+        <button class="btn tiny danger" id="app-form-delete" hidden>删除</button>
+        <span class="spacer"></span>
+        <button class="btn tiny" id="app-form-cancel">取消</button>
+        <button class="btn tiny primary" id="app-form-save">保存</button>
+      </footer>
+    </div>
+  </div>
+
   <script src="panel.js"></script>
 </body>
 </html>

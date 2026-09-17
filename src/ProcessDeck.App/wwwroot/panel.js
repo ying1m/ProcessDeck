@@ -24,6 +24,28 @@ const viewportEl = document.getElementById('viewport');
 const cardHost = document.getElementById('card-host');
 const cardFrame = document.getElementById('card-frame');
 const cardPicker = document.getElementById('card-picker');
+const appForm = document.getElementById('app-form');
+const appFormTitle = document.getElementById('app-form-title');
+const appFormDelete = document.getElementById('app-form-delete');
+const fieldTemplate = document.getElementById('field-template');
+const fieldUrl = document.getElementById('field-url');
+const fieldPattern = document.getElementById('field-pattern');
+
+const formFields = {
+  template: document.getElementById('f-template'),
+  name: document.getElementById('f-name'),
+  description: document.getElementById('f-description'),
+  start: document.getElementById('f-start'),
+  stop: document.getElementById('f-stop'),
+  cwd: document.getElementById('f-cwd'),
+  port: document.getElementById('f-port'),
+  stopTimeout: document.getElementById('f-stoptimeout'),
+  readiness: document.getElementById('f-readiness'),
+  timeout: document.getElementById('f-timeout'),
+  url: document.getElementById('f-url'),
+  pattern: document.getElementById('f-pattern'),
+  autostart: document.getElementById('f-autostart'),
+};
 
 const STATE_LABEL = {
   stopped: '已停止',
@@ -335,6 +357,7 @@ function createCard(app) {
       <button class="btn tiny" data-act="stop">停止</button>
       <button class="btn tiny" data-act="restart">重启</button>
       <span class="spacer"></span>
+      <button class="btn tiny ghost" data-act="edit">编辑</button>
       <button class="btn tiny ghost" data-act="copy">复制命令</button>
     </div>
   `;
@@ -342,6 +365,7 @@ function createCard(app) {
   card.querySelector('[data-act="start"]').addEventListener('click', () => send({ type: 'startApp', appId: app.id }));
   card.querySelector('[data-act="stop"]').addEventListener('click', () => send({ type: 'stopApp', appId: app.id }));
   card.querySelector('[data-act="restart"]').addEventListener('click', () => send({ type: 'restartApp', appId: app.id }));
+  card.querySelector('[data-act="edit"]').addEventListener('click', () => openAppForm(app.id));
   card.querySelector('[data-act="copy"]').addEventListener('click', () => {
     navigator.clipboard.writeText(app.startCommand || '');
     showToast('启动命令已复制到剪贴板', 'info');
@@ -496,7 +520,7 @@ function updateSummary() {
 }
 
 function renderEmptyState(isEmpty) {
-  const existing = board.querySelector('.empty-state');
+  const existing = board.querySelector('.welcome');
 
   if (!isEmpty) {
     if (existing) {
@@ -509,25 +533,55 @@ function renderEmptyState(isEmpty) {
     return;
   }
 
-  const empty = document.createElement('div');
-  empty.className = 'empty-state';
-  empty.innerHTML = `
-    <h2>还没有任何应用</h2>
-    <p>ProcessDeck 用一个 JSON 文件描述要管理的应用：启动命令、停止方式、工作目录、端口、就绪探针。</p>
-    <p class="mono" id="empty-config-path"></p>
-    <div class="empty-actions">
-      <button class="btn primary" id="btn-reload">重新加载配置</button>
+  const welcome = document.createElement('div');
+  welcome.className = 'welcome';
+  welcome.innerHTML = `
+    <h2>欢迎使用 ProcessDeck</h2>
+    <p>它把「必须手敲命令才能启动、关闭方式还各不相同」的本地应用，变成一块可自定义的面板。</p>
+    <ol>
+      <li>创建第一个应用，填上启动命令即可；</li>
+      <li>停止命令可以不填 —— 会先往终端发 Ctrl+C，最后强制回收整棵进程树；</li>
+      <li>填了端口，启动前就会做冲突预检，并告诉你端口被谁占着。</li>
+    </ol>
+    <div class="welcome-actions">
+      <button class="btn primary" id="btn-first-app">创建第一个应用</button>
+      <button class="btn" id="btn-import-demo">导入一个示例</button>
+      <button class="btn ghost" id="btn-open-folder">打开配置文件夹</button>
+      <button class="btn ghost" id="btn-reload">重新加载配置</button>
     </div>
+    <p class="welcome-path" id="welcome-path"></p>
   `;
 
-  board.appendChild(empty);
+  board.appendChild(welcome);
 
-  const pathEl = empty.querySelector('#empty-config-path');
-  pathEl.textContent = (snapshot && snapshot.configurationPath) || '';
+  welcome.querySelector('#welcome-path').textContent =
+    `配置文件：${(snapshot && snapshot.configurationPath) || '（未知）'}`;
 
-  empty.querySelector('#btn-reload').addEventListener('click', () => {
-    send({ type: 'reloadConfig' });
-    showToast('已请求重新加载配置', 'info');
+  welcome.querySelector('#btn-first-app').addEventListener('click', () => openAppForm(null));
+  welcome.querySelector('#btn-import-demo').addEventListener('click', importExampleApp);
+  welcome.querySelector('#btn-open-folder').addEventListener('click', () => send({ type: 'openConfigFolder' }));
+  welcome.querySelector('#btn-reload').addEventListener('click', () => send({ type: 'reloadConfig' }));
+}
+
+/**
+ * 一个「一定能跑起来」的示例：只用 Windows 自带的 PowerShell 监听一个端口。
+ * 不依赖 Node / Python / .NET，装完就能点「启动」看到卡片变绿。
+ */
+function importExampleApp() {
+  const startCommand = `powershell -NoProfile -Command "$l=[System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback,38400); $l.Start(); Write-Host 'listening on 38400'; while($true){ Start-Sleep -Seconds 1 }"`;
+
+  send({
+    type: 'saveApp',
+    app: {
+      id: 'example-listener',
+      name: '示例：本地端口服务',
+      description: '用 PowerShell 监听 38400 端口，演示端口就绪判定。',
+      startCommand,
+      port: 38400,
+      stopTimeoutSeconds: 5,
+      autoStart: false,
+      readiness: { kind: 'Port', timeoutSeconds: 20, intervalMs: 300 },
+    },
   });
 }
 
@@ -550,6 +604,215 @@ function showToast(message, level) {
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
+/* ---------------- 新建 / 编辑应用表单 ---------------- */
+
+let editingAppId = null;
+
+const TEMPLATES = [
+  {
+    id: '',
+    label: '—— 不用模板 ——',
+    apply: () => {},
+  },
+  {
+    id: 'node',
+    label: 'Node / pnpm dev',
+    apply: () => {
+      formFields.name.value = '前端 dev server';
+      formFields.start.value = 'cmd.exe /c pnpm dev';
+      formFields.port.value = '5173';
+      formFields.readiness.value = 'Port';
+    },
+  },
+  {
+    id: 'dotnet',
+    label: '.NET 项目',
+    apply: () => {
+      formFields.name.value = 'API 服务';
+      formFields.start.value = 'dotnet run --project .';
+      formFields.port.value = '5000';
+      formFields.readiness.value = 'Http';
+      formFields.url.value = 'http://127.0.0.1:5000/';
+    },
+  },
+  {
+    id: 'python-http',
+    label: 'Python 静态服务',
+    apply: () => {
+      formFields.name.value = '静态网页服务';
+      formFields.start.value = 'python -m http.server 8000 --bind 127.0.0.1';
+      formFields.port.value = '8000';
+      formFields.readiness.value = 'Port';
+    },
+  },
+  {
+    id: 'powershell',
+    label: 'PowerShell 脚本',
+    apply: () => {
+      formFields.name.value = '自定义脚本';
+      formFields.start.value = 'powershell -NoProfile -ExecutionPolicy Bypass -File .\\run.ps1';
+      formFields.readiness.value = 'None';
+    },
+  },
+];
+
+for (const template of TEMPLATES) {
+  const option = document.createElement('option');
+  option.value = template.id;
+  option.textContent = template.label;
+  formFields.template.appendChild(option);
+}
+
+formFields.template.addEventListener('change', () => {
+  const template = TEMPLATES.find((t) => t.id === formFields.template.value);
+  if (template) {
+    template.apply();
+    updateReadinessFields();
+  }
+});
+
+/** 就绪类型决定要显示哪个补充字段，避免让用户面对一堆无关输入框。 */
+function updateReadinessFields() {
+  const kind = formFields.readiness.value;
+  fieldUrl.hidden = kind !== 'Http';
+  fieldPattern.hidden = kind !== 'Log';
+}
+
+formFields.readiness.addEventListener('change', updateReadinessFields);
+
+function findApp(appId) {
+  return ((snapshot && snapshot.apps) || []).find((a) => a.id === appId) || null;
+}
+
+function openAppForm(appId) {
+  editingAppId = appId || null;
+
+  const app = editingAppId ? findApp(editingAppId) : null;
+  const definition = (app && app.definition) || null;
+
+  appFormTitle.textContent = app ? `编辑「${app.name}」` : '新建应用';
+  appFormDelete.hidden = !app;
+  // 模板只在新建时有意义：编辑已有应用时套模板会把用户填好的东西冲掉。
+  fieldTemplate.hidden = !!app;
+
+  formFields.template.value = '';
+  formFields.name.value = definition ? definition.name || '' : '';
+  formFields.description.value = definition ? definition.description || '' : '';
+  formFields.start.value = definition ? definition.startCommand || '' : '';
+  formFields.stop.value = definition ? definition.stopCommand || '' : '';
+  formFields.cwd.value = definition ? definition.workingDirectory || '' : '';
+  formFields.port.value = definition && definition.port ? String(definition.port) : '';
+  formFields.stopTimeout.value = String((definition && definition.stopTimeoutSeconds) || 15);
+
+  const readiness = (definition && definition.readiness) || {};
+  formFields.readiness.value = readiness.kind || 'None';
+  formFields.timeout.value = String(readiness.timeoutSeconds || 60);
+  formFields.url.value = readiness.url || '';
+  formFields.pattern.value = readiness.pattern || '';
+  formFields.autostart.checked = !!(definition && definition.autoStart);
+
+  updateReadinessFields();
+  appForm.hidden = false;
+  formFields.name.focus();
+}
+
+function closeAppForm() {
+  appForm.hidden = true;
+  editingAppId = null;
+}
+
+function submitAppForm() {
+  const name = formFields.name.value.trim();
+  const startCommand = formFields.start.value.trim();
+
+  if (!name) {
+    showToast('请填写名称', 'error');
+    formFields.name.focus();
+    return;
+  }
+
+  if (!startCommand) {
+    showToast('请填写启动命令', 'error');
+    formFields.start.focus();
+    return;
+  }
+
+  const kind = formFields.readiness.value;
+  const readiness = { kind, timeoutSeconds: Number(formFields.timeout.value) || 60 };
+
+  if (kind === 'Http') {
+    readiness.url = formFields.url.value.trim();
+    if (!readiness.url) {
+      showToast('HTTP 就绪判定需要填写健康检查地址', 'error');
+      return;
+    }
+  }
+
+  if (kind === 'Log') {
+    readiness.pattern = formFields.pattern.value.trim();
+    if (!readiness.pattern) {
+      showToast('日志就绪判定需要填写匹配正则', 'error');
+      return;
+    }
+  }
+
+  const portText = formFields.port.value.trim();
+
+  // Host 侧会用和手改 JSON 完全相同的校验再查一遍，这里只做即时反馈。
+  send({
+    type: 'saveApp',
+    app: {
+      id: editingAppId || '',
+      name,
+      description: formFields.description.value.trim() || null,
+      startCommand,
+      stopCommand: formFields.stop.value.trim() || null,
+      workingDirectory: formFields.cwd.value.trim() || null,
+      port: portText ? Number(portText) : null,
+      stopTimeoutSeconds: Number(formFields.stopTimeout.value) || 15,
+      startGraceSeconds: 2,
+      autoStart: formFields.autostart.checked,
+      readiness,
+    },
+  });
+
+  closeAppForm();
+}
+
+function deleteEditingApp() {
+  if (!editingAppId) {
+    return;
+  }
+
+  const app = findApp(editingAppId);
+  const label = app ? app.name : editingAppId;
+
+  if (!confirm(`确定删除「${label}」吗？\n\n如果它正在运行，会先被停止。`)) {
+    return;
+  }
+
+  send({ type: 'deleteApp', appId: editingAppId });
+  closeAppForm();
+}
+
+document.getElementById('app-form-save').addEventListener('click', submitAppForm);
+document.getElementById('app-form-cancel').addEventListener('click', closeAppForm);
+document.getElementById('app-form-close').addEventListener('click', closeAppForm);
+appFormDelete.addEventListener('click', deleteEditingApp);
+
+// 点遮罩或按 Esc 关闭
+appForm.addEventListener('mousedown', (e) => {
+  if (e.target === appForm) {
+    closeAppForm();
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !appForm.hidden) {
+    closeAppForm();
+  }
+});
+
 /* ---------------- 主题 ---------------- */
 
 const btnTheme = document.getElementById('btn-theme');
@@ -562,9 +825,7 @@ btnTheme.addEventListener('click', () => {
   send({ type: 'savePreferences', theme: next, layout: (snapshot && snapshot.layout) || null });
 });
 
-document.getElementById('btn-add').addEventListener('click', () => {
-  showToast('下一步接入：新建应用向导（启动命令 / 停止方式 / 端口 / 就绪探针）', 'info');
-});
+document.getElementById('btn-add').addEventListener('click', () => openAppForm(null));
 
 /* ---------------- 启动 ---------------- */
 

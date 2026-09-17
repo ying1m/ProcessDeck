@@ -98,7 +98,18 @@ ProcessDeck 就是这块缺口。
 | `startGraceSeconds` | number | 无探针时，进程存活多久算就绪，默认 2 |
 | `autoStart` | boolean | ProcessDeck 启动时自动拉起 |
 
-### 3. 从源码构建
+### 3. 也可以用界面完成
+
+面板右上角的「+ 添加应用」会打开表单：名称、启动命令、停止命令、工作目录、端口、就绪判定，
+并带 Node / .NET / Python / PowerShell 几个模板。
+
+首次启动时面板会显示向导，可以一键导入一个**只依赖 Windows 自带 PowerShell** 的示例应用 ——
+装完就能点「启动」看到卡片变绿，不需要提前装任何东西。
+
+配置文件始终是纯文本，两种方式可以混用：手改之后点一下「重新加载配置」即可。
+应用卡片上还有「编辑」按钮；运行中的应用会要求先停止再改（避免命令改了、进程还是旧的）。
+
+### 4. 从源码构建
 
 ```powershell
 git clone https://github.com/ying1m/ProcessDeck.git
@@ -250,8 +261,8 @@ WebView2 自带 `postMessage` / `WebMessageReceived` 通道，走**进程内消�
 - [x] WebView2 面板 + IPC + 实时日志
 - [x] 拖拽排序 + CSS 变量主题
 - [x] 沙箱化自定义卡片（含安全回归测试 `tools/security-probe-card`）
+- [x] 首运向导与图形化新建 / 编辑应用
 - [ ] 主题包（用户可分享的 CSS 变量集）
-- [ ] 首运向导与图形化「新建应用」
 - [ ] 面板内嵌终端（交互式输入）
 - [ ] 自动更新与 winget 发布
 

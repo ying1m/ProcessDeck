@@ -46,6 +46,12 @@ public sealed record AppSnapshot
 
     /// <summary>最近若干行终端输出（已剥离 ANSI）。</summary>
     public required IReadOnlyList<string> LogTail { get; init; }
+
+    /// <summary>
+    /// 完整的应用定义。面板的编辑表单需要它来预填字段。
+    /// 刻意随快照一起下发而不是另开查询接口 —— 定义只有几百字节，省一次往返更划算。
+    /// </summary>
+    public AppDefinition? Definition { get; init; }
 }
 
 /// <summary>推给面板的完整快照。</summary>
@@ -212,6 +218,7 @@ public sealed class DeckHostService : IDisposable
                 StopCommand = definition.StopCommand,
                 Accent = definition.Accent,
                 LogTail = logTail,
+                Definition = definition,
             });
         }
 
@@ -372,6 +379,156 @@ public sealed class DeckHostService : IDisposable
         foreach (var id in ids)
         {
             _ = StartAppAsync(id);
+        }
+    }
+
+    /// <summary>
+    /// 新增或更新一个应用定义。
+    ///
+    /// 运行中的定义**不允许就地修改**：<see cref="AppSupervisor"/> 持有的是定义对象引用，
+    /// 直接替换会让界面与实际运行的进程脱节（命令改了、进程还是旧的，
+    /// 用户会误以为改动已生效）。要求先停止，语义才明确。
+    /// </summary>
+    public bool TrySaveApp(AppDefinition definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+
+        var problems = definition.Validate();
+        if (problems.Count > 0)
+        {
+            RaiseNotice("error", string.Join(" ", problems));
+            return false;
+        }
+
+        definition.EnsureId();
+
+        AppSupervisor? existing;
+
+        lock (_gate)
+        {
+            existing = _supervisors.FirstOrDefault(s =>
+                string.Equals(s.Definition.Id, definition.Id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (existing is not null && existing.State is AppState.Starting or AppState.Running or AppState.Stopping)
+        {
+            RaiseNotice("error", $"「{existing.Definition.Name}」正在运行，请先停止再修改。");
+            return false;
+        }
+
+        lock (_gate)
+        {
+            var index = Configuration.Apps.FindIndex(a =>
+                string.Equals(a.Id, definition.Id, StringComparison.OrdinalIgnoreCase));
+
+            if (index >= 0)
+            {
+                Configuration.Apps[index] = definition;
+            }
+            else
+            {
+                Configuration.Apps.Add(definition);
+            }
+
+            try
+            {
+                _store.Save(Configuration);
+            }
+            catch (Exception ex)
+            {
+                RaiseNotice("error", $"保存配置失败：{ex.Message}");
+                return false;
+            }
+
+            if (existing is not null)
+            {
+                existing.Changed -= OnSupervisorChanged;
+                existing.Dispose();
+                _supervisors.Remove(existing);
+            }
+
+            var supervisor = new AppSupervisor(definition);
+            supervisor.Changed += OnSupervisorChanged;
+            _supervisors.Add(supervisor);
+        }
+
+        RaiseNotice("info", $"已保存「{definition.Name}」。");
+        RaiseInvalidated();
+        return true;
+    }
+
+    /// <summary>
+    /// 删除一个应用。若它正在运行，会先走完整的停止流程再移除 ——
+    /// 否则会留下一个没人管、却还占着端口的进程。
+    /// </summary>
+    public async Task<bool> DeleteAppAsync(string appId)
+    {
+        AppSupervisor? existing;
+
+        lock (_gate)
+        {
+            existing = _supervisors.FirstOrDefault(s =>
+                string.Equals(s.Definition.Id, appId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (existing is null)
+        {
+            RaiseNotice("error", $"找不到应用：{appId}");
+            return false;
+        }
+
+        if (existing.State is not AppState.Stopped and not AppState.Failed)
+        {
+            await existing.StopAsync().ConfigureAwait(false);
+        }
+
+        lock (_gate)
+        {
+            existing.Changed -= OnSupervisorChanged;
+            existing.Dispose();
+            _supervisors.Remove(existing);
+
+            Configuration.Apps.RemoveAll(a =>
+                string.Equals(a.Id, appId, StringComparison.OrdinalIgnoreCase));
+
+            try
+            {
+                _store.Save(Configuration);
+            }
+            catch (Exception ex)
+            {
+                RaiseNotice("error", $"保存配置失败：{ex.Message}");
+                return false;
+            }
+        }
+
+        RaiseNotice("info", $"已删除「{existing.Definition.Name}」。");
+        RaiseInvalidated();
+        return true;
+    }
+
+    /// <summary>在资源管理器里打开配置目录，方便用户直接手改 JSON。</summary>
+    public void OpenConfigFolder()
+    {
+        var directory = Path.GetDirectoryName(_store.FilePath);
+
+        if (string.IsNullOrEmpty(directory))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(directory);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{directory}\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            RaiseNotice("error", $"打开配置目录失败：{ex.Message}");
         }
     }
 

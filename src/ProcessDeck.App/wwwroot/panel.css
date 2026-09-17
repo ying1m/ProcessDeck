@@ -50,6 +50,16 @@
 
 * { box-sizing: border-box; }
 
+/*
+  全局兜底，别删。
+  本文件里带 display 的作者样式（.board 的 grid、.card-host 的 flex、
+  .field 的 flex、.modal-backdrop 的 flex）优先级都高于 UA 样式表的
+  [hidden] { display: none }，于是 hidden 属性会静默失效 ——
+  这个坑在本项目里已经踩过三次（面板、卡片宿主、表单字段）。
+  统一在这里用 !important 一次性解决，后续加新组件不会再犯。
+*/
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -333,4 +343,154 @@ body {
 #card-picker option {
   background: var(--bg-elevated);
   color: var(--fg);
+}
+
+/* ---------------- 新建 / 编辑应用表单 ---------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+  z-index: 80;
+}
+
+/* 同 .board[hidden] 的理由：作者样式的 display 会盖掉 UA 的 [hidden]。 */
+.modal-backdrop[hidden] { display: none; }
+
+.modal {
+  width: 100%;
+  max-width: 620px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 { margin: 0; font-size: 15px; flex: 1; }
+
+.modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-foot .spacer { flex: 1; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+
+.field > span { font-size: 12px; color: var(--fg-muted); }
+
+.field .req { color: var(--state-failed); }
+
+.field input[type="text"],
+.field input[type="number"],
+.field select,
+.field textarea {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--fg);
+  width: 100%;
+  resize: vertical;
+}
+
+.field textarea { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.field.checkbox input { width: auto; }
+.field.checkbox span { font-size: 13px; color: var(--fg); }
+
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+
+.btn.danger {
+  color: var(--state-failed);
+  border-color: color-mix(in srgb, var(--state-failed) 45%, transparent);
+}
+
+.btn.danger:hover { background: color-mix(in srgb, var(--state-failed) 14%, transparent); }
+
+/* ---------------- 首运向导 ---------------- */
+
+.welcome {
+  grid-column: 1 / -1;
+  max-width: 640px;
+  margin: 28px auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 30px;
+  background: var(--bg-card);
+}
+
+.welcome h2 { margin: 0 0 12px; font-size: 18px; }
+
+.welcome p { margin: 8px 0; font-size: 13px; line-height: 1.75; color: var(--fg-muted); }
+
+.welcome ol { margin: 12px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.9; color: var(--fg-muted); }
+
+.welcome code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.welcome-actions {
+  margin-top: 22px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.welcome-path {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--fg-faint);
+  word-break: break-all;
 }
