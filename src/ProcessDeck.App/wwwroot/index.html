@@ -50,6 +50,33 @@
     <span id="viewport" class="mono"></span>
   </footer>
 
+  <!--
+    交互式终端抽屉。
+    面板用的不是完整 ANSI 终端模拟器（那需要引入 xterm.js 之类的第三方库），
+    而是「实时输出 + 行输入」：足够回答交互式提示、确认 y/n、粘贴 token，
+    而且零依赖、样式完全跟随主题。
+  -->
+  <section class="terminal-drawer" id="terminal-drawer" hidden>
+    <header class="terminal-head">
+      <span class="dot"></span>
+      <span class="terminal-title" id="terminal-title">终端</span>
+      <span class="terminal-meta" id="terminal-meta"></span>
+      <span class="spacer"></span>
+      <button class="btn tiny" id="terminal-ctrlc" title="发送 Ctrl+C（中断当前命令）">Ctrl+C</button>
+      <button class="btn tiny" id="terminal-ctrld" title="发送 Ctrl+D（EOF）">Ctrl+D</button>
+      <button class="btn tiny ghost" id="terminal-close" title="收起（Esc）">✕</button>
+    </header>
+
+    <pre class="terminal-output mono" id="terminal-output"></pre>
+
+    <footer class="terminal-input">
+      <span class="terminal-prompt mono">›</span>
+      <input id="terminal-line" type="text" spellcheck="false"
+             placeholder="输入内容后回车发送到应用终端…" />
+      <button class="btn tiny primary" id="terminal-send">发送</button>
+    </footer>
+  </section>
+
   <!-- 新建 / 编辑应用表单 -->
   <div class="modal-backdrop" id="app-form" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="app-form-title">

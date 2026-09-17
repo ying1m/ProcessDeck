@@ -25,6 +25,7 @@ const cardHost = document.getElementById('card-host');
 const cardFrame = document.getElementById('card-frame');
 const cardPicker = document.getElementById('card-picker');
 const themePicker = document.getElementById('theme-picker');
+const terminalDrawer = document.getElementById('terminal-drawer');
 const appForm = document.getElementById('app-form');
 const appFormTitle = document.getElementById('app-form-title');
 const appFormDelete = document.getElementById('app-form-delete');
@@ -128,6 +129,7 @@ function applySnapshot(data) {
   applyTheme(data.theme || 'dark');
   applyActiveCard();
   pushToCard();
+  renderTerminal();
 }
 
 /* ---------------- 主题 ---------------- */
@@ -487,11 +489,14 @@ function createCard(app) {
   });
 
   // 日志区：用户手动往上滚时就不再自动跟随，否则没法复制历史输出。
+  // 点一下则展开交互式终端 —— 交互式程序光看输出不够，还得能回答它的提示。
   const log = card.querySelector('.card-log');
+  log.title = '点击打开交互式终端';
   log.addEventListener('scroll', () => {
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
     card.dataset.autoscroll = atBottom ? 'true' : 'false';
   });
+  log.addEventListener('click', () => openTerminal(app.id));
 
   return card;
 }
@@ -681,6 +686,134 @@ function showToast(message, level) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
 }
+
+/* ---------------- 交互式终端 ---------------- */
+
+const terminalTitle = document.getElementById('terminal-title');
+const terminalMeta = document.getElementById('terminal-meta');
+const terminalOutput = document.getElementById('terminal-output');
+const terminalLine = document.getElementById('terminal-line');
+const terminalSend = document.getElementById('terminal-send');
+const terminalCtrlC = document.getElementById('terminal-ctrlc');
+const terminalCtrlD = document.getElementById('terminal-ctrld');
+const terminalDot = terminalDrawer.querySelector('.dot');
+
+let terminalAppId = null;
+
+function openTerminal(appId) {
+  if (!findApp(appId)) {
+    return;
+  }
+
+  terminalAppId = appId;
+  terminalDrawer.hidden = false;
+  terminalOutput.dataset.content = '';
+
+  // 告诉宿主放大这个应用的日志下发量。卡片仍然只拿 30 行。
+  send({ type: 'focusApp', appId });
+
+  renderTerminal();
+  terminalLine.focus();
+}
+
+function closeTerminal() {
+  if (terminalDrawer.hidden) {
+    return;
+  }
+
+  terminalDrawer.hidden = true;
+  terminalAppId = null;
+  send({ type: 'focusApp', appId: null });
+}
+
+function renderTerminal() {
+  if (terminalDrawer.hidden || !terminalAppId) {
+    return;
+  }
+
+  const app = findApp(terminalAppId);
+
+  if (!app) {
+    closeTerminal();
+    return;
+  }
+
+  terminalDot.className = `dot ${app.state || 'stopped'}`;
+  terminalTitle.textContent = app.name || app.id;
+
+  const bits = [STATE_LABEL[app.state] || app.state, `${app.processes || 0} 进程`];
+  if (app.pid) {
+    bits.push(`PID ${app.pid}`);
+  }
+
+  const ports = Object.keys(app.ports || {});
+  if (ports.length > 0) {
+    bits.push(`端口 ${ports.join(', ')}`);
+  }
+
+  terminalMeta.textContent = bits.join(' · ');
+
+  const lines = app.logTail || [];
+  const text = lines.length > 0 ? lines.join('\n') : '（暂无输出）';
+
+  if (terminalOutput.dataset.content !== text) {
+    const atBottom = terminalOutput.scrollHeight - terminalOutput.scrollTop - terminalOutput.clientHeight < 48;
+    terminalOutput.dataset.content = text;
+    terminalOutput.textContent = text;
+
+    if (atBottom) {
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+  }
+
+  const running = app.state === 'running' || app.state === 'starting';
+  terminalLine.disabled = !running;
+  terminalSend.disabled = !running;
+  terminalCtrlC.disabled = !running;
+  terminalCtrlD.disabled = !running;
+  terminalLine.placeholder = running ? '输入内容后回车发送到应用终端…' : '应用未在运行，无法输入';
+}
+
+function sendTerminalLine() {
+  if (!terminalAppId || terminalLine.disabled) {
+    return;
+  }
+
+  const text = terminalLine.value;
+
+  // 空回车不代劳：不少 CLI 会把「裸回车」解释成「重复上一条命令」。
+  if (!text) {
+    return;
+  }
+
+  // 行尾必须是 \r。伪控制台里的回车键就是这个字符；
+  // 只发 \n 在相当多程序里不会触发提交，表现为「输入了但没反应」。
+  send({ type: 'sendInput', appId: terminalAppId, text: `${text}\r` });
+  terminalLine.value = '';
+  terminalLine.focus();
+}
+
+function sendControlChar(char) {
+  if (!terminalAppId) {
+    return;
+  }
+
+  send({ type: 'sendInput', appId: terminalAppId, text: char });
+  terminalLine.focus();
+}
+
+terminalSend.addEventListener('click', sendTerminalLine);
+
+terminalLine.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendTerminalLine();
+  }
+});
+
+terminalCtrlC.addEventListener('click', () => sendControlChar('\u0003'));
+terminalCtrlD.addEventListener('click', () => sendControlChar('\u0004'));
+document.getElementById('terminal-close').addEventListener('click', closeTerminal);
 
 /* ---------------- 新建 / 编辑应用表单 ---------------- */
 
@@ -886,8 +1019,17 @@ appForm.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !appForm.hidden) {
+  if (e.key !== 'Escape') {
+    return;
+  }
+
+  if (!appForm.hidden) {
     closeAppForm();
+    return;
+  }
+
+  if (!terminalDrawer.hidden) {
+    closeTerminal();
   }
 });
 

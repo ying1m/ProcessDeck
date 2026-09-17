@@ -96,6 +96,12 @@ public sealed class DeckHostService : IDisposable
     /// <summary>每张卡片最多推多少行日志。太多会把 IPC 变成瓶颈。</summary>
     private const int LogTailLines = 30;
 
+    /// <summary>
+    /// 面板展开了终端的那一个应用推多少行。
+    /// 只对聚焦的应用放大，其余仍保持 30 行 —— 否则每次快照都会背上一大坨无关日志。
+    /// </summary>
+    private const int FocusedLogTailLines = 400;
+
     private readonly ConfigurationStore _store;
     private readonly List<AppSupervisor> _supervisors = new();
     private readonly object _gate = new();
@@ -129,6 +135,21 @@ public sealed class DeckHostService : IDisposable
     public string ConfigurationPath => _store.FilePath;
 
     public string? LoadError { get; private set; }
+
+    /// <summary>面板当前展开终端的应用 id；null 表示没有展开。</summary>
+    public string? FocusedAppId { get; private set; }
+
+    /// <summary>告诉宿主面板正在看哪个应用的终端，用于调整日志下发量。</summary>
+    public void SetFocusedApp(string? appId)
+    {
+        if (string.Equals(FocusedAppId, appId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        FocusedAppId = string.IsNullOrWhiteSpace(appId) ? null : appId;
+        RaiseInvalidated();
+    }
 
     /// <summary>快照需要重推。可能在任意线程触发。</summary>
     public event Action? SnapshotInvalidated;
@@ -178,6 +199,7 @@ public sealed class DeckHostService : IDisposable
         IReadOnlyList<string> cardProblems;
         IReadOnlyList<ThemeDescriptor> themes;
         IReadOnlyList<string> themeProblems;
+        string? focusedAppId;
 
         lock (_gate)
         {
@@ -188,6 +210,7 @@ public sealed class DeckHostService : IDisposable
             cardProblems = _cardProblems;
             themes = _themes;
             themeProblems = _themeProblems;
+            focusedAppId = FocusedAppId;
         }
 
         var apps = new List<AppSnapshot>(supervisors.Count);
@@ -207,9 +230,13 @@ public sealed class DeckHostService : IDisposable
             }
 
             var logTail = supervisor.LogTail;
-            if (logTail.Count > LogTailLines)
+            var limit = string.Equals(definition.Id, focusedAppId, StringComparison.OrdinalIgnoreCase)
+                ? FocusedLogTailLines
+                : LogTailLines;
+
+            if (logTail.Count > limit)
             {
-                logTail = logTail.Skip(logTail.Count - LogTailLines).ToArray();
+                logTail = logTail.Skip(logTail.Count - limit).ToArray();
             }
 
             apps.Add(new AppSnapshot
@@ -350,6 +377,26 @@ public sealed class DeckHostService : IDisposable
     {
         await StopAppAsync(appId).ConfigureAwait(false);
         await StartAppAsync(appId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 把面板上输入的文本送进应用的伪控制台。
+    /// 面板负责决定发什么：普通输入带 <c>\r</c> 结尾，控制键直接发对应控制字符。
+    /// </summary>
+    public void SendInput(string appId, string text)
+    {
+        var supervisor = Find(appId);
+
+        if (supervisor is null)
+        {
+            RaiseNotice("error", $"找不到应用：{appId}");
+            return;
+        }
+
+        if (!supervisor.TryWriteInput(text, out var error))
+        {
+            RaiseNotice("error", error ?? "发送失败。");
+        }
     }
 
     /// <summary>持久化前端拥有的偏好（主题、布局）。</summary>

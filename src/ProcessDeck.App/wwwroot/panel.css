@@ -352,6 +352,78 @@ body {
   color: var(--fg);
 }
 
+/* ---------------- 交互式终端抽屉 ---------------- */
+
+.terminal-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 33px;                 /* 让开底部状态栏 */
+  height: 46vh;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-strong);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, .4);
+  z-index: 60;
+}
+
+.terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-head .spacer { flex: 1; }
+.terminal-title { font-weight: 600; font-size: 13px; }
+
+.terminal-meta { font-size: 12px; color: var(--fg-muted); }
+
+.terminal-output {
+  flex: 1;
+  margin: 0;
+  padding: 12px 16px;
+  overflow-y: auto;
+  background: var(--log-bg);
+  color: var(--log-fg);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.terminal-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.terminal-prompt { color: var(--accent); font-size: 15px; }
+
+.terminal-input input {
+  flex: 1;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.terminal-input input:focus { outline: none; border-color: var(--accent); }
+.terminal-input input:disabled { opacity: .5; }
+
+/* 卡片日志区可点开终端 */
+.card-log { cursor: pointer; }
+.card-log:hover { border-color: var(--accent); }
+
 /* ---------------- 新建 / 编辑应用表单 ---------------- */
 
 .modal-backdrop {

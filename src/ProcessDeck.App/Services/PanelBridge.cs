@@ -217,6 +217,17 @@ public sealed class PanelBridge : IDisposable
                     await _host.DeleteAppAsync(RequireString(root, "appId")).ConfigureAwait(false);
                     break;
 
+                case "sendInput":
+                    _host.SendInput(
+                        RequireString(root, "appId"),
+                        root?["text"]?.GetValue<string>() ?? string.Empty);
+                    break;
+
+                case "focusApp":
+                    // 允许为 null：面板收起终端时就是用它来还原默认日志量。
+                    _host.SetFocusedApp(root?["appId"]?.GetValue<string>());
+                    break;
+
                 case "ensureConfigFile":
                     _host.EnsureConfigurationFile();
                     break;

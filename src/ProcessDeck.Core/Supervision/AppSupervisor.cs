@@ -189,6 +189,69 @@ public sealed class AppSupervisor : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// 把文本写进应用的伪控制台，等价于用户在终端里敲字。
+    ///
+    /// 这是「交互式应用」的关键：只把进程拉起来、能看输出还不够，
+    /// 还得能回答它的提示（首次运行向导、确认 y/n、输入 token 之类）。
+    /// 没有伪控制台的应用无法交互，会返回 false 而不是抛异常。
+    /// </summary>
+    public bool TryWriteInput(string text, out string? error)
+    {
+        SupervisedProcess? process;
+
+        lock (_gate)
+        {
+            process = _process;
+        }
+
+        if (process is null)
+        {
+            error = "应用未在运行，无法发送输入。";
+            return false;
+        }
+
+        if (!process.HasPseudoConsole)
+        {
+            error = "该应用没有伪控制台，无法交互输入。";
+            return false;
+        }
+
+        try
+        {
+            process.WriteInput(text);
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"写入终端失败：{ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 调整伪控制台尺寸。不做的话子进程仍按旧宽度折行，输出会错位。
+    /// </summary>
+    public void ResizeConsole(short columns, short rows)
+    {
+        SupervisedProcess? process;
+
+        lock (_gate)
+        {
+            process = _process;
+        }
+
+        try
+        {
+            process?.ResizeConsole(columns, rows);
+        }
+        catch (Exception)
+        {
+            // 尺寸调整失败不影响主流程，也不值得打扰用户。
+        }
+    }
+
     /// <summary>终端输出快照。停止之后仍然可读，便于在 UI 上展示「为什么挂了」。</summary>
     public IReadOnlyList<string> LogTail
     {
